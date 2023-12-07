@@ -1,0 +1,25 @@
+{
+    "version": "2.0",
+    "logging": {
+        "applicationInsights": {
+            "samplingSettings": {
+                "isEnabled": true,
+                "excludedTypes": "Request"
+            },
+            "enableLiveMetricsFilters": true
+        },
+        "logLevel": { "default": "Information" }
+    },
+    "extensions": {
+        "http": {
+            "routePrefix": "api",
+            "customHeaders": {
+                "Cache-Control": "no-cache",
+                "Referrer-Policy": "no-referrer",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+                "X-XSS-Protection": "1; mode=block"
+            }
+        }
+    }
+}
