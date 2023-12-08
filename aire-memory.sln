@@ -5,6 +5,12 @@ VisualStudioVersion = 17.5.002.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "aire-memory", "aire-memory.csproj", "{0C618DFC-B6C9-4DEF-B1E0-1961373D697D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "submodules", "submodules", "{B4E10CFC-389A-4406-AAC2-3D38D741FB86}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "aire-dotnet-sdk", "aire-dotnet-sdk", "{0B46259A-CBDD-40B7-B011-0631C9022522}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aire.Sdk.Auth", "submodules\aire-dotnet-sdk\Aire.Sdk.Auth\Aire.Sdk.Auth.csproj", "{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,11 +21,19 @@ Global
 		{0C618DFC-B6C9-4DEF-B1E0-1961373D697D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C618DFC-B6C9-4DEF-B1E0-1961373D697D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C618DFC-B6C9-4DEF-B1E0-1961373D697D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4B8126D4-E9C2-4A9A-A729-BEC1118D3812}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0B46259A-CBDD-40B7-B011-0631C9022522} = {B4E10CFC-389A-4406-AAC2-3D38D741FB86}
+		{C61C80C4-D5A8-4FF6-83CB-AB3DBDF39688} = {0B46259A-CBDD-40B7-B011-0631C9022522}
 	EndGlobalSection
 EndGlobal

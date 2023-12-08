@@ -1,16 +1,21 @@
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
-using Newtonsoft.Json;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
-using Microsoft.OpenApi.Models;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using Aire.Memory;
+using Aire.Sdk.Auth.Extensions;
+using Aire.Sdk.Auth.Models;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
         worker.UseNewtonsoftJson();
+        worker.UseJwtAuth();
     })
     .ConfigureServices(services => {
         services.AddApplicationInsightsTelemetryWorkerService();
@@ -34,6 +39,15 @@ var host = new HostBuilder()
                 ForceHttps = false
             };
             return options;
+        });
+
+        services.Configure<JwtTokenServiceConfiguration>(o => {
+            o.SigningKey = AireEnvironment.TokenSigningKey;
+            o.EncryptionKey = AireEnvironment.TokenEncryptionKey;
+        });
+
+        services.AddDbContext<DatabaseContext>(options => {
+            options.UseNpgsql(AireEnvironment.DatabaseConnectionString);
         });
     })
     .Build();

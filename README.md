@@ -24,6 +24,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AirePlatformService": "http://localhost:7071/api",
         "TokenSigningKey": "<signing key shared between platform modules>",
         "TokenEncryptionKey": "<enryption key shared between platform modules>",
+        "DatabaseConnectionString": "postgresql://...",
         "OpenApi__HostNames": "http://localhost:7073/api/"
     },
     "Host": {

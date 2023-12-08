@@ -16,6 +16,8 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.16.2" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.21.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="1.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
+    <PackageReference Include="Npgsql.Json.NET" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">
@@ -28,5 +30,14 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Threading.ExecutionContext" Alias="ExecutionContext" />
+  </ItemGroup>
+    <ItemGroup>
+    <Content Remove="submodules\**" />
+    <Compile Remove="submodules\**" />
+    <EmbeddedResource Remove="submodules\**" />
+    <None Remove="submodules\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Auth\Aire.Sdk.Auth.csproj" />
   </ItemGroup>
 </Project>
