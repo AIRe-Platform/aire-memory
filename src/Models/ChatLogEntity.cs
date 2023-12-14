@@ -6,13 +6,9 @@ namespace Aire.Memory.Models
     public class ChatLogEntity
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-
         public Guid? UserId { get; set; }
-
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
         public string? EncryptedChatLog { get; set; }
-
 
         public List<ChatMessage>? GetChatLog(string userKey)
         {

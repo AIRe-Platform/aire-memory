@@ -6,7 +6,6 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Aire.Memory;
 using Aire.Sdk.Auth.Extensions;
@@ -16,8 +15,6 @@ var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
         worker.UseNewtonsoftJson();
         worker.UseJwtAuth(new JwtTokenServiceConfiguration() {
-            Issuer = AireEnvironment.TokenIssuer,
-            Audience = AireEnvironment.TokenAudience,
             SigningKey = AireEnvironment.TokenSigningKey,
             EncryptionKey = AireEnvironment.TokenEncryptionKey
         });

@@ -27,10 +27,7 @@ namespace Aire.Memory
                 .Entity<ChatLogEntity>()
                 .ToTable("ChatLogs")
                 .HasKey(e => e.Id);
-
         }
-
-        
     }
 
     public class DatabaseContextFactory : IDesignTimeDbContextFactory<DatabaseContext>
