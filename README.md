@@ -24,7 +24,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AirePlatformService": "http://localhost:7071/api",
         "TokenSigningKey": "<signing key shared between platform modules>",
         "TokenEncryptionKey": "<enryption key shared between platform modules>",
-        "DatabaseConnectionString": "postgresql://...",
+        "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=...",
         "OpenApi__HostNames": "http://localhost:7073/api/"
     },
     "Host": {
@@ -33,6 +33,20 @@ You should create `local.settings.json` in the root of the repository when devel
         "CORSCredentials": false
     }
 }
+```
+
+## Setting Up the Database
+
+The schema is managed in a code-first fashion. Define your entities in `src/DatabaseContext.cs` and then use the command below to generate migrations.
+
+```sh
+dotnet ef migrations add MyNewMigrationName
+```
+
+Run the following command to run migrations.
+
+```sh
+DatabaseConnectionString="..." dotnet ef database update
 ```
 
 ## API Documentation
@@ -45,11 +59,14 @@ Example: If the module is running on port `7073` change the URL to `http://local
 
 ## Deployment
 
+Run migrations on the database as instructed above.
+
 Publish the Fuctions app and then setup the following required environment values:
 
 - `AirePlatformService` The endpoint of the AIRe Services module.
 - `TokenSigningKey` The token signing key shared between the platform instance modules.
 - `TokenEncryptionKey` The token encryption key shared between the platform instance modules.
+- `DatabaseConnectionString` The connection string for a PostgreSql database.
 
 ## Disclaimer
 

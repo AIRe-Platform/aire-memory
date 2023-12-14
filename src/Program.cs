@@ -15,7 +15,12 @@ using Aire.Sdk.Auth.Models;
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
         worker.UseNewtonsoftJson();
-        worker.UseJwtAuth();
+        worker.UseJwtAuth(new JwtTokenServiceConfiguration() {
+            Issuer = AireEnvironment.TokenIssuer,
+            Audience = AireEnvironment.TokenAudience,
+            SigningKey = AireEnvironment.TokenSigningKey,
+            EncryptionKey = AireEnvironment.TokenEncryptionKey
+        });
     })
     .ConfigureServices(services => {
         services.AddApplicationInsightsTelemetryWorkerService();
@@ -41,14 +46,7 @@ var host = new HostBuilder()
             return options;
         });
 
-        services.Configure<JwtTokenServiceConfiguration>(o => {
-            o.SigningKey = AireEnvironment.TokenSigningKey;
-            o.EncryptionKey = AireEnvironment.TokenEncryptionKey;
-        });
-
-        services.AddDbContext<DatabaseContext>(options => {
-            options.UseNpgsql(AireEnvironment.DatabaseConnectionString);
-        });
+        services.AddDbContext<DatabaseContext>();
     })
     .Build();
 

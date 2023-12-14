@@ -1,0 +1,46 @@
+@base_url = http://localhost:7073/api
+
+@token = eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.U1L28rsBdQS9PGmEV3C5FIgnS4K4ES8SpMidHpAL13XsGGY7ZFGZ9sUC3US1zK8O0-AYZ_BglwubffPLk2y0gKqxH8jJxmCi.iW4FVx6foLHCk-zVKz-SbQ.O2Hke6x_q9HuvXVwtgbjxSRhTvzc39rW7iKDX-SKVGnPBQfE0wRFYzWD1TSRMK22vdN2BuTFr-uPwYIX3oNyIev5CMoGKRe6K5xE6pRDfZmMyde7CvD23K68TrJe5QHi8IT2jciav_Tj91QPxFAotAcL9x-W-ltcLce451Ixtwi3kB2AjlHbkQlLeCUyFgsAo-g9oMoXM56P2_g6DV9h1vi3Wk8PME66AfohVCHMyk2S7s93y_KpVqtvczYd0AeFsINnxrXje2XA8KRpRbgjG6GKwT1bjAsNRo2g7iV7E3fsXDo67m7dZleGCIW8bjDWaNC_uh2NSKKBkI2Yh5iGH_sojCUbr3KUmHou_z_sdRvNhI2E4Q-5ZjmRs1w1oGo0F-D0eg0GpkhcsNae7dZIdWPpwNJVjRvbenQ8tZ-KNKv-CU-J38hl-2WyF26lKLEb4pyFV9YKnL8Bj5wt2_rprhySDJ5N7hSbpCTatGuf6PQoMBtGW9WxQhOdjlf2zKja-glcodzVtg3kanFd2HdTlYeRkW0ZjjEBbGUY4G7aiwG38fx4msZCGYX9nYMjjUpiruhM5Cqdf-888M-yeneNEAVORlVfZtNMwM-4mfOnGYwcQnnHsn7nkEoafT4DVBSIAwMqOae5gzicRpcqxe4J0LcA2onGJ2WwYc5rbCobjmsT1ekEaqKLGjwji-87pIDCTl0PvgW4QIVrfdzft6utZD6SXUULsWTot2xY99yb-jAMhcpmuUGQLBxFGyO-xbEd.ESVn7Hd_ZVA9NzPfbLmAkXUTSTd47eeGU54UQM_10UI
+
+@chat_id = 57b7cc8d-3903-4017-80be-44b5089e64d9
+
+### Retrieve metadata of all chat logs
+
+GET {{base_url}}/v1/chat-history HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Retrieve a chat log
+
+GET {{base_url}}/v1/chat-history/{{chat_id}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Post a new chat log
+
+POST {{base_url}}/v1/chat-history HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+[
+    { "role": "user", "content": "How much is the fish?", "timestamp": 1234 }
+]
+
+### Edit existing chat log
+
+PUT {{base_url}}/v1/chat-history/{{chat_id}} HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+[
+    { "role": "user", "content": "1+1=x?", "timestamp": 2345 },
+    { "role": "assistant", "content": "x=2", "timestamp": 2346 }
+]
+
+### Delete a chat log
+
+DELETE {{base_url}}/v1/chat-history/{{chat_id}} HTTP/1.1
+Authorization: Bearer {{token}}
+
