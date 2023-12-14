@@ -31,7 +31,7 @@ namespace Aire.Memory.Api
 
         [Function("GetChatHistory_v1")]
         [OpenApiOperation(operationId: "GetChatHistory", tags: ["chat-history"], Description = "Get a list of chat logs")]
-        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ChatLogMetadata>), Description = "List of chat metadata objects")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> GetChatHistory(
@@ -52,7 +52,7 @@ namespace Aire.Memory.Api
 
         [Function("GetChatHistoryWithId_v1")]
         [OpenApiOperation(operationId: "GetChatHistoryWithId", tags: ["chat-history"], Description = "Retrieve a chat log")]
-        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ChatMessage>), Description = "List of chat messages")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found.")]
@@ -83,7 +83,7 @@ namespace Aire.Memory.Api
 
         [Function("PostChatHistory_v1")]
         [OpenApiOperation(operationId: "PostChatHistory", tags: ["chat-history"], Description = "Store new chat log")]
-        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
         [OpenApiRequestBody("application/json", typeof(List<ChatMessage>), Description = "List of chat messages", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
@@ -116,7 +116,7 @@ namespace Aire.Memory.Api
 
         [Function("PutChatHistory_v1")]
         [OpenApiOperation(operationId: "PutChatHistory", tags: ["chat-history"], Description = "Edit existing chat log")]
-        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", Required = true)]
         [OpenApiRequestBody("application/json", typeof(List<ChatMessage>), Description = "List of chat messages", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
@@ -157,7 +157,7 @@ namespace Aire.Memory.Api
 
         [Function("DeleteChatHistory_v1")]
         [OpenApiOperation(operationId: "DeleteChatHistory", tags: ["chat-history"], Description = "Wipe a chat log")]
-        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT", Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", Required = true)]
         [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlog(s) removed successfully")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
