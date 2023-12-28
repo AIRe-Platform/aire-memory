@@ -35,6 +35,14 @@ jobs:
           dotnet build --configuration Release --output ./output
           popd
 
+      - name: Update database
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet tool restore
+          dotnet ef database update
+        env:
+          DatabaseConnectionString: ${{ secrets.DB_CONNECTION_STRING }}
+
       - name: 'Run Azure Functions Action'
         uses: Azure/functions-action@v1
         id: fa
