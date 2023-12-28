@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
         uses: actions/setup-dotnet@v1
