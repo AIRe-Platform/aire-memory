@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Aire.Memory;
 using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Auth.Models;
+using Microsoft.EntityFrameworkCore;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -46,5 +47,11 @@ var host = new HostBuilder()
         services.AddDbContext<DatabaseContext>();
     })
     .Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+    db.Database.Migrate();
+}
 
 host.Run();
