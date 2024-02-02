@@ -58,8 +58,8 @@ namespace Aire.Memory.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content");
 
-                    b.Property<string>("Keywords")
-                        .HasColumnType("text")
+                    b.Property<string[]>("Keywords")
+                        .HasColumnType("text[]")
                         .HasColumnName("keywords");
 
                     b.Property<string>("Lang")

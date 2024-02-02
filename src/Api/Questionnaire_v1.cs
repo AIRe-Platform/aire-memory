@@ -37,8 +37,14 @@ namespace Aire.Memory.Api
         {
             var list = await _db.Questionnaires
                 .ToListAsync();
+            
+            var questionnaires = new List<Questionnaire>();
+            foreach (var item in list)
+            {
+                questionnaires.Add(new Questionnaire(item));
+            }
 
-            return new ObjectResult(list);
+            return new ObjectResult(questionnaires);
         }
 
         [Function("PostQuestionnaire_v1")]
@@ -46,11 +52,14 @@ namespace Aire.Memory.Api
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
             FunctionContext context)
         {
-            Debug.WriteLine(req);
-            var questionnaire = await req.ReadJson<QuestionnaireEntity>();
-            Debug.WriteLine(questionnaire);
+            var questionnaire = await req.ReadJson<Questionnaire>();
             if(questionnaire == null)
                 return new BadRequestResult();
+
+            var entity = new QuestionnaireEntity(questionnaire);
+
+            var add = await _db.Questionnaires.AddAsync(entity);
+            await add.Context.SaveChangesAsync();
 
             return new ObjectResult(questionnaire);
         }

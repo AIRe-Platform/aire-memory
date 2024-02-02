@@ -19,7 +19,7 @@ namespace Aire.Memory.Migrations
                     name = table.Column<string>(type: "text", nullable: true),
                     lang = table.Column<string>(type: "text", nullable: true),
                     modified = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    keywords = table.Column<string>(type: "text", nullable: true),
+                    keywords = table.Column<string[]>(type: "text[]", nullable: true),
                     preliminary = table.Column<string>(type: "text", nullable: true),
                     content = table.Column<string>(type: "text", nullable: true)
                 },

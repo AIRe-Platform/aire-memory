@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aire.Memory.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20240131135148_CreateQuestionnaire")]
+    [Migration("20240202134458_CreateQuestionnaire")]
     partial class CreateQuestionnaire
     {
         /// <inheritdoc />
@@ -61,8 +61,8 @@ namespace Aire.Memory.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content");
 
-                    b.Property<string>("Keywords")
-                        .HasColumnType("text")
+                    b.Property<string[]>("Keywords")
+                        .HasColumnType("text[]")
                         .HasColumnName("keywords");
 
                     b.Property<string>("Lang")
