@@ -1,0 +1,102 @@
+@base_url = http://localhost:7073/api
+
+### Retrieve metadata of all chat logs
+
+POST {{base_url}}/v1/questionnaire HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+
+{
+    "id": "d65b8044-3679-4cdf-8422-0f472aec6edb",
+    "name": "My Survey",
+    "lang": "en",
+    "modified": "2020-01-01T00:00:00.000Z",
+    "keywords": [
+        "quality of life",
+        "mental health"
+    ],
+    "preliminary": {
+        "properties": {
+            "age": {
+                "type": "integer"
+            },
+            "gender": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "age"
+        ]
+    },
+    "content": [
+        {
+            "id": "1",
+            "name": "Mental Health",
+            "keywords": [
+                "mental health"
+            ],
+            "questions": [
+                {
+                    "id": "1.1",
+                    "question": "How happy are you?",
+                    "keywords": [
+                        "happiness"
+                    ],
+                    "prompt": "The user ranks his/her happiness as {answer} on a scale from {min} to {max}.",
+                    "options": {
+                        "type": "range",
+                        "min": 0,
+                        "max": 5
+                    }
+                },
+                {
+                    "id": "1.2",
+                    "question": "I am worried about...",
+                    "keywords": [
+                        "stress",
+                        "worry"
+                    ],
+                    "prompt": "The user is worried about {answer}.",
+                    "options": {
+                        "type": "checkbox",
+                        "values": [
+                            "Work",
+                            "Family",
+                            "Money"
+                        ],
+                        "multiselect": true
+                    }
+                },
+                {
+                    "id": "1.3",
+                    "question": "Please enter the country you live in",
+                    "keywords": [
+                        "location"
+                    ],
+                    "prompt": "The user's residence is in {location}.",
+                    "options": {
+                        "type": "open",
+                        "max_len": 120,
+                        "match": "/.+/g",
+                        "multiline": true
+                    },
+                    "required": true
+                },
+                {
+                    "id": "1.4",
+                    "question": "Enter a number",
+                    "keywords": [
+                        "useless"
+                    ],
+                    "prompt": "Here's a useless random number: {answer}. It's not actually random if it's {default}. Keep it safe!",
+                    "options": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 666,
+                        "default": 42
+                    }
+                }
+            ]
+        }
+    ]
+}

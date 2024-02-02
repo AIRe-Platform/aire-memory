@@ -15,7 +15,7 @@ namespace Aire.Memory.Models
         public string? Name { get; set; }
 
         [JsonProperty("keywords")]
-        public string? Keywords { get; set; }
+        public string[]? Keywords { get; set; }
 
         [NotMapped]
         public List<QuestionItem>? Questions { get; set; }

@@ -31,7 +31,7 @@ namespace Aire.Memory.Api
         }
 
         [Function("GetQuestionnaire_v1")]
-        public async Task<IActionResult> GetChatHistory(
+        public async Task<IActionResult> GetQuestionnaire(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire")] HttpRequest req,
             FunctionContext context)
         {
@@ -39,6 +39,20 @@ namespace Aire.Memory.Api
                 .ToListAsync();
 
             return new ObjectResult(list);
+        }
+
+        [Function("PostQuestionnaire_v1")]
+        public async Task<IActionResult> PostQuestionnaire(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
+            FunctionContext context)
+        {
+            Debug.WriteLine(req);
+            var questionnaire = await req.ReadJson<QuestionnaireEntity>();
+            Debug.WriteLine(questionnaire);
+            if(questionnaire == null)
+                return new BadRequestResult();
+
+            return new ObjectResult(questionnaire);
         }
     }
 }
