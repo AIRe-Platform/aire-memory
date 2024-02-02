@@ -28,8 +28,14 @@ namespace Aire.Memory.Models
             Lang = questionnaire.Lang;
             Modified = questionnaire.Modified;
             Keywords = questionnaire.Keywords;
-            Preliminary = questionnaire.Preliminary.ObjectToJson<Preliminary>();
-            Content = questionnaire.Content.ObjectToJson<List<QuestionnaireContent>>();
+            
+            if(questionnaire.Preliminary is not null) {
+                Preliminary = questionnaire.Preliminary.ObjectToJson<Preliminary>();
+            }
+            if(questionnaire.Content is not null) {
+                Content = questionnaire.Content.ObjectToJson<List<QuestionnaireContent>>();
+            }
+            
         }
     }
 

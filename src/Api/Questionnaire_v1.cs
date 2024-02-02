@@ -31,13 +31,29 @@ namespace Aire.Memory.Api
         }
 
         [Function("GetQuestionnaire_v1")]
-        public async Task<IActionResult> GetQuestionnaire(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire")] HttpRequest req,
+        [OpenApiOperation(
+            operationId: "getQuestionnaire",
+            tags: ["questionnaire"],
+            Summary = "Get a list of questionnaires")]
+        [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Questionnaire>), Description = "List of questionnaires")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+        public async Task<IActionResult> GetQuestionnaires(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/questionnaire")] HttpRequest req,
             FunctionContext context)
         {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadQuestionnaire))
+                return new UnauthorizedResult();
+
             var list = await _db.Questionnaires
                 .ToListAsync();
-            
+
             var questionnaires = new List<Questionnaire>();
             foreach (var item in list)
             {
@@ -47,13 +63,70 @@ namespace Aire.Memory.Api
             return new ObjectResult(questionnaires);
         }
 
+        [Function("GetQuestionnaireWithId_v1")]
+        [OpenApiOperation(
+            operationId: "getQuestionnaireWithId",
+            tags: ["questionnaire"],
+            Summary = "Retrieve a questionnaire")]
+        [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+        [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Questionnaire>), Description = "List of questionnaires")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found.")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+        public async Task<IActionResult> GetQuestionnaireWithId(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/questionnaire/{id}")] HttpRequest req,
+            FunctionContext context,
+            string id)
+        {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadQuestionnaire))
+                return new UnauthorizedResult();
+
+            if (!Guid.TryParse(id, out Guid questionnaireId))
+                return new BadRequestResult();
+
+            var ent = await _db.Questionnaires
+                .Where(x => x.Id == questionnaireId)
+                .FirstOrDefaultAsync();
+
+            var questionnaire = new Questionnaire(ent);
+            if (questionnaire == null)
+                return new NotFoundResult();
+
+            return new ObjectResult(questionnaire);
+        }
+
         [Function("PostQuestionnaire_v1")]
+        [OpenApiOperation(
+            operationId: "postQuesionnaire",
+            tags: ["questionnaire"],
+            Summary = "Store new questionnaire")]
+        [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+        [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "A questionnaire", Required = true)]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Saved questionnaire")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> PostQuestionnaire(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/questionnaire")] HttpRequest req,
             FunctionContext context)
         {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.WriteQuestionnaire))
+                return new UnauthorizedResult();
+
             var questionnaire = await req.ReadJson<Questionnaire>();
-            if(questionnaire == null)
+            if (questionnaire == null)
                 return new BadRequestResult();
 
             var entity = new QuestionnaireEntity(questionnaire);

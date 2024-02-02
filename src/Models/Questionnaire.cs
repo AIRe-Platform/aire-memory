@@ -27,18 +27,31 @@ namespace Aire.Memory.Models
         [JsonProperty("content")]
         public List<QuestionnaireContent>? Content { get; set; }
 
-        public Questionnaire() {
+        public Questionnaire()
+        {
 
         }
 
-        public Questionnaire(QuestionnaireEntity questionnaireEntity) {
-            Id = questionnaireEntity.Id;
-            Name = questionnaireEntity.Name;
-            Lang = questionnaireEntity.Lang;
-            Modified = questionnaireEntity.Modified;
-            Keywords = questionnaireEntity.Keywords;
-            Preliminary = questionnaireEntity.Preliminary.JsonToObject<Preliminary>();
-            Content = questionnaireEntity.Content.JsonToObject<List<QuestionnaireContent>>();
+        public Questionnaire(QuestionnaireEntity? questionnaireEntity)
+        {
+            if (questionnaireEntity is not null)
+            {
+                Id = questionnaireEntity.Id;
+                Name = questionnaireEntity.Name;
+                Lang = questionnaireEntity.Lang;
+                Modified = questionnaireEntity.Modified;
+                Keywords = questionnaireEntity.Keywords;
+
+                if (questionnaireEntity.Preliminary is not null)
+                {
+                    Preliminary = questionnaireEntity.Preliminary.JsonToObject<Preliminary>();
+                }
+
+                if (questionnaireEntity.Content is not null)
+                {
+                    Content = questionnaireEntity.Content.JsonToObject<List<QuestionnaireContent>>();
+                }
+            }
         }
     }
 

@@ -1,5 +1,12 @@
 @base_url = http://localhost:7073/api
 
+@questionnaire_id = d65b8044-3679-4cdf-8422-0f472aec6edb
+
+### Get one example questionnaire
+
+GET {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1
+Accept: application/json
+
 ### Get all questionnaires
 
 GET {{base_url}}/v1/questionnaire HTTP/1.1
