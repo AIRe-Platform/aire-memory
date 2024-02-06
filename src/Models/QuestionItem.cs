@@ -1,7 +1,4 @@
-using System.Data.Common;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Newtonsoft.Json;
-using Aire.Sdk.Helpers;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Aire.Memory.Models
@@ -24,13 +21,5 @@ namespace Aire.Memory.Models
         [JsonProperty("options")]
         [NotMapped]
         public QuestionOptions? Options { get; set; }
-
-        // public QuestionItem(string id, string question, string[] keywords, string prompt, string options) {
-        //     Id = id;
-        //     Question = question;
-        //     Keywords = keywords;
-        //     Prompt = prompt;
-        //     Options = options?.JsonToObject<QuestionOptions>();
-        // }
     }
 }

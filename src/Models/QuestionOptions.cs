@@ -1,4 +1,3 @@
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Newtonsoft.Json;
 using Aire.Sdk.Helpers;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -32,7 +31,8 @@ namespace Aire.Memory.Models
         [JsonProperty("default")]
         public int? Default { get; set; }
 
-        public QuestionOptions? GetQuestionOptions(string json) {
+        public QuestionOptions? GetQuestionOptions(string json)
+        {
             return json?.JsonToObject<QuestionOptions>();
         }
     }

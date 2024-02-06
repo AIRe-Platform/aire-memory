@@ -13,7 +13,6 @@ using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Net;
-using System.Diagnostics;
 
 namespace Aire.Memory.Api
 {
@@ -104,7 +103,7 @@ namespace Aire.Memory.Api
 
         [Function("PostQuestionnaire_v1")]
         [OpenApiOperation(
-            operationId: "postQuesionnaire",
+            operationId: "postQuestionnaire",
             tags: ["questionnaire"],
             Summary = "Store new questionnaire")]
         [OpenApiSecurity(

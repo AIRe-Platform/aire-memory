@@ -1,21 +1,26 @@
 @base_url = http://localhost:7073/api
 
+@token = eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.NfGZ91olG6oJSq4lukcU5jpiDCirq9avPiwi7R3-nGYaYPIhYOQCJOHxod_WI30eb0ktfrgMJFLl0q2BhdA_xmw5KKBFT-kv.TrNHDKSIAWyCyV2Y3OVVDA.ZBLd2jit_xXofKppZ5fMW-r1Ke8zCDHKmMISTnYz9quZoCrsbTvbCGyP0DfFmq7g1ILIq3Dak-GlCL-t-2SGTKbmINjJ5OrHeN0CGi2rV4fitD3vK-A1T-1Nchc0rIg43R4t8OVrVApBzsipKC6yqyxb_NuPRu0SzrEJ8jYZyTePpNpFfFYriF3BAMrucRE2rRL0E8KWb1keopVzcM5AoGcb4Yeb8HpvXfntNY7xLCiDUXfd7sTlWKDRXCCWpB6lMFhI0nm-jBlpHmzjJ0NmlrudbjXiVwCh9rzcka3PJ3nMF1vxJF3pZfK7ECWAQIuztdTxEV54ReAwRAVFDzVcL6Wpl3fytC3ngTwVlCvU-rs0W4wm5d_FLuksnwPXNiNxrEm8ROfXMGLCwy9KKgQVTVWyao7h2h0-XFuPbP0rCfp7yxrI4M8UyhjkIRneZKg-7mFTH4TVvdqSux9ZPfv9V_jbN9mRhCLiNLkE8oZhVGbc3NRbLDpAz36Z3orSbpdbK6_8rTinwfvH717W-Z4AGc12dOBCROl2bjH0eupz0Sql3X1ZYuL9gDv8eAbWAcmc-tycsdNY_cjysR-fKYXJs04-ekGFSoHEqk_q8nvYP4nPoVWphJiA7_QFYQ0RH6ELWKxNz7uqL01Q4PsbTJffTWR3NWd9C2azjUez-V9yQ2dUdERY2VRLX-2wdsrZk8GBfAqyd5HF2e2ZZUyLKiEdK37PDCslcapk2N4w4vkrZKsng5EHPXqczECNjHpLcRCcP5TuXHXnk37NJTHlfXjKHdXQMqlgxOSFCRuZzs-BNhiiz-vLB-iX9Gq2sSvhEtnPrb5xI_wV_lY0Tj4GhPptAmwnv2yp7finBJ5YfT6aDvfOiPYnG6Sez5nnguuNBjNyMlm5yo9X9RIuFD4tMxZj1oGvmkGXRMZDjpX6IGFxGgtskniuXhKPqDTyc0WW8cIR.SxRBPIETDSfRdbbdpoRELpFvKJc6JA98zdFWuqsLg4M
+
 @questionnaire_id = d65b8044-3679-4cdf-8422-0f472aec6edb
 
 ### Get one example questionnaire
 
 GET {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ### Get all questionnaires
 
 GET {{base_url}}/v1/questionnaire HTTP/1.1
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ### Post a questionnaire
 
 POST {{base_url}}/v1/questionnaire HTTP/1.1
 Accept: application/json
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 < ./questionnaire_example.json

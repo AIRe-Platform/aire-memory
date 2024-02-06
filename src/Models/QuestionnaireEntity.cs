@@ -18,24 +18,25 @@ namespace Aire.Memory.Models
 
         public string? Content { get; set; }
 
-        public QuestionnaireEntity() {
-        
-        }
+        public QuestionnaireEntity() { }
 
-        public QuestionnaireEntity(Questionnaire questionnaire) {
+        public QuestionnaireEntity(Questionnaire questionnaire)
+        {
             Id = questionnaire.Id;
             Name = questionnaire.Name;
             Lang = questionnaire.Lang;
             Modified = questionnaire.Modified;
             Keywords = questionnaire.Keywords;
-            
-            if(questionnaire.Preliminary is not null) {
+
+            if (questionnaire.Preliminary is not null)
+            {
                 Preliminary = questionnaire.Preliminary.ObjectToJson<Preliminary>();
             }
-            if(questionnaire.Content is not null) {
+            if (questionnaire.Content is not null)
+            {
                 Content = questionnaire.Content.ObjectToJson<List<QuestionnaireContent>>();
             }
-            
+
         }
     }
 

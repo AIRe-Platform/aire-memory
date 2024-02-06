@@ -1,9 +1,6 @@
 using Newtonsoft.Json;
-using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
-using System.Data.Common;
 using Aire.Sdk.Helpers;
 using System.ComponentModel.DataAnnotations.Schema;
-using Newtonsoft.Json.Linq;
 
 namespace Aire.Memory.Models
 {
@@ -27,10 +24,7 @@ namespace Aire.Memory.Models
         [JsonProperty("content")]
         public List<QuestionnaireContent>? Content { get; set; }
 
-        public Questionnaire()
-        {
-
-        }
+        public Questionnaire() { }
 
         public Questionnaire(QuestionnaireEntity? questionnaireEntity)
         {
