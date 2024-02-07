@@ -47,7 +47,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
                 return new UnauthorizedResult();
 
             var list = await _db.ChatLogs
@@ -80,7 +80,7 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
                 return new UnauthorizedResult();
 
             if(!Guid.TryParse(id, out Guid chatId))
@@ -117,7 +117,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.WriteChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
                 return new UnauthorizedResult();
 
             var chat = await req.ReadJson<List<ChatMessage>>();
@@ -161,7 +161,7 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.WriteChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
                 return new UnauthorizedResult();
 
             if(!Guid.TryParse(id, out Guid chatId))
@@ -207,7 +207,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.DeleteChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
                 return new UnauthorizedResult();
 
             var history = await _db.ChatLogs
@@ -245,7 +245,7 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.DeleteChatHistory))
+            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
                 return new UnauthorizedResult();
 
             if(!Guid.TryParse(id, out Guid chatId))

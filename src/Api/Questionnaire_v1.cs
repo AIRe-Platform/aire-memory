@@ -47,7 +47,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadQuestionnaire))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
                 return new UnauthorizedResult();
 
             var list = await _db.Questionnaires
@@ -84,7 +84,7 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.ReadQuestionnaire))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
                 return new UnauthorizedResult();
 
             if (!Guid.TryParse(id, out Guid questionnaireId))
@@ -122,7 +122,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if (!_jwt.CheckAuthorization(auth, AireRoles.User, AireScopes.WriteQuestionnaire))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
                 return new UnauthorizedResult();
 
             var questionnaire = await req.ReadJson<Questionnaire>();
