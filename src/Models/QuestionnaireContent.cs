@@ -1,9 +1,7 @@
 using Newtonsoft.Json;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Aire.Memory.Models
 {
-    [NotMapped]
     public class QuestionnaireContent
     {
         [JsonProperty("id", Required = Required.Always)]
@@ -15,7 +13,7 @@ namespace Aire.Memory.Models
         [JsonProperty("keywords")]
         public string[]? Keywords { get; set; }
 
-        [NotMapped]
+        [JsonProperty("questions")]
         public List<QuestionItem>? Questions { get; set; }
     }
 }

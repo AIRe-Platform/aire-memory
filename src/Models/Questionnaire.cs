@@ -8,10 +8,13 @@ namespace Aire.Memory.Models
     {
         [JsonProperty("id")]
         public Guid? Id { get; set; } = Guid.NewGuid();
+
         [JsonProperty("name")]
         public string? Name { get; set; }
+
         [JsonProperty("lang")]
         public string? Lang { get; set; }
+
         [JsonProperty("modified")]
         public DateTime Modified { get; set; }
 
@@ -26,26 +29,15 @@ namespace Aire.Memory.Models
 
         public Questionnaire() { }
 
-        public Questionnaire(QuestionnaireEntity? questionnaireEntity)
+        public Questionnaire(QuestionnaireEntity questionnaireEntity)
         {
-            if (questionnaireEntity is not null)
-            {
-                Id = questionnaireEntity.Id;
-                Name = questionnaireEntity.Name;
-                Lang = questionnaireEntity.Lang;
-                Modified = questionnaireEntity.Modified;
-                Keywords = questionnaireEntity.Keywords;
-
-                if (questionnaireEntity.Preliminary is not null)
-                {
-                    Preliminary = questionnaireEntity.Preliminary.JsonToObject<Preliminary>();
-                }
-
-                if (questionnaireEntity.Content is not null)
-                {
-                    Content = questionnaireEntity.Content.JsonToObject<List<QuestionnaireContent>>();
-                }
-            }
+            Id = questionnaireEntity.Id;
+            Name = questionnaireEntity.Name;
+            Lang = questionnaireEntity.Lang;
+            Modified = questionnaireEntity.Modified;
+            Keywords = questionnaireEntity.Keywords;
+            Preliminary = questionnaireEntity.Preliminary?.JsonToObject<Preliminary>();
+            Content = questionnaireEntity.Content?.JsonToObject<List<QuestionnaireContent>>();
         }
     }
 
@@ -54,6 +46,7 @@ namespace Aire.Memory.Models
     {
         [JsonProperty("properties")]
         public Dictionary<string, Property>? Properties { get; set; }
+
         [JsonProperty("required")]
         public List<string>? Required { get; set; }
     }

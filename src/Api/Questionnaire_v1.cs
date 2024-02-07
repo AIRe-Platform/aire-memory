@@ -94,9 +94,10 @@ namespace Aire.Memory.Api
                 .Where(x => x.Id == questionnaireId)
                 .FirstOrDefaultAsync();
 
-            var questionnaire = new Questionnaire(ent);
-            if (questionnaire == null)
+            if(ent == null)
                 return new NotFoundResult();
+
+            var questionnaire = new Questionnaire(ent);
 
             return new ObjectResult(questionnaire);
         }

@@ -1,10 +1,8 @@
 using Newtonsoft.Json;
 using Aire.Sdk.Helpers;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Aire.Memory.Models
 {
-    [NotMapped]
     public class QuestionOptions
     {
         [JsonProperty("type", Required = Required.Always)]
@@ -31,7 +29,7 @@ namespace Aire.Memory.Models
         [JsonProperty("default")]
         public int? Default { get; set; }
 
-        public QuestionOptions? GetQuestionOptions(string json)
+        public static QuestionOptions? GetQuestionOptions(string json)
         {
             return json?.JsonToObject<QuestionOptions>();
         }
