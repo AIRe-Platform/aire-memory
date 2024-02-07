@@ -4,10 +4,10 @@ namespace Aire.Memory.Models
 {
     public class QuestionItem
     {
-        [JsonProperty("id", Required = Required.Always)]
+        [JsonProperty("id", Required = Newtonsoft.Json.Required.Always)]
         public string? Id { get; set; }
 
-        [JsonProperty("question")]
+        [JsonProperty("question", Required = Newtonsoft.Json.Required.Always)]
         public string? Question { get; set; }
 
         [JsonProperty("keywords")]
@@ -16,7 +16,13 @@ namespace Aire.Memory.Models
         [JsonProperty("prompt")]
         public string? Prompt { get; set; }
 
+        [JsonProperty("type", Required = Newtonsoft.Json.Required.Always)]
+        public QuestionOptionType? Type { get; set; }
+
         [JsonProperty("options")]
-        public QuestionOptions? Options { get; set; }
+        public object? Options { get; set; }
+
+        [JsonProperty("required")]
+        public bool? Required { get; set; } = false;
     }
 }
