@@ -13,8 +13,12 @@ namespace Aire.Memory.Models
         [OpenApiProperty(Description = "The message timestamp in Unix time")]
         public long Timestamp { get; set; }
 
-        [JsonProperty("content", Required = Required.Always)]
+        [JsonProperty("content")]
         [OpenApiProperty(Description = "Message content")]
         public string? Content { get; set; }
+
+        [JsonProperty("rating")]
+        [OpenApiProperty(Description = "Message rating")]
+        public int? Rating { get; set; }
     }
 }
