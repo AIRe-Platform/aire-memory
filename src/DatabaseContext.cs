@@ -11,6 +11,7 @@ namespace Aire.Memory
         {}
 
         public DbSet<ChatLogEntity> ChatLogs { get; set; }
+        public DbSet<QuestionnaireEntity> Questionnaires { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -26,6 +27,12 @@ namespace Aire.Memory
             modelBuilder
                 .Entity<ChatLogEntity>()
                 .ToTable("ChatLogs")
+                .HasKey(e => e.Id);
+
+
+            modelBuilder
+                .Entity<QuestionnaireEntity>()
+                .ToTable("Questionnaires")
                 .HasKey(e => e.Id);
         }
     }

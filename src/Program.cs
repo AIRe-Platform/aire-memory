@@ -34,9 +34,11 @@ var host = new HostBuilder()
                     Title = "AIRe Memory Module",
                     Description = "This is the reference implementation of AIRe Platform Memory module."
                 },
-                Servers = DefaultOpenApiConfigurationOptions.GetHostNames(),
+                Servers = [
+                    new OpenApiServer { Url = AireEnvironment.OpenApiHost ?? "/api" }
+                ],
                 OpenApiVersion = OpenApiVersionType.V3,
-                IncludeRequestingHostName = true,
+                IncludeRequestingHostName = false,
                 ForceHttp = false,
                 ForceHttps = false
             };
