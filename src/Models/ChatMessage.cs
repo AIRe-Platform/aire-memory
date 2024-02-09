@@ -20,5 +20,9 @@ namespace Aire.Memory.Models
         [JsonProperty("rating")]
         [OpenApiProperty(Description = "Message rating")]
         public int? Rating { get; set; }
+
+        [JsonProperty("answer")]
+        [OpenApiProperty(Description = "Answer content")]
+        public string? Answer { get; set; }
     }
 }

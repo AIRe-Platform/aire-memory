@@ -1,13 +1,14 @@
 {
-    "id": "d65b8044-3679-4cdf-8422-0f472aec6edb",
+    "id": "d65b8044-3679-4cdf-8422-0f472aec6edb", 
     "name": "My Survey",
-    "lang": "en",
-    "modified": "2020-01-01T00:00:00.000Z",
+    "lang": "en", 
+    "modified": "2020-01-01T00:00:00.000Z", 
     "keywords": [
         "quality of life",
         "mental health"
-    ],
-    "preliminary": {
+    ], 
+    "preliminary": { 
+
         "properties": {
             "age": {
                 "type": "integer"
@@ -20,25 +21,25 @@
             "age"
         ]
     },
-    "content": [
+    "content": [ 
         {
             "id": "1",
             "name": "Mental Health",
             "keywords": [
                 "mental health"
-            ],
-            "questions": [
+            ], 
+            "questions": [ 
                 {
-                    "id": "1.1",
-                    "question": "How happy are you?",
+                    "id": "1.1", 
+                    "question": "How happy are you?", 
                     "keywords": [
                         "happiness"
-                    ],
-                    "prompt": "The user ranks his/her happiness as {answer} on a scale from {min} to {max}.",
+                    ], 
+                    "prompt": "The user ranks his/her happiness as {answer} on a scale from {min} to {max}.", 
+                    "type": "range", 
                     "options": {
-                        "type": "range",
-                        "min": 0,
-                        "max": 5
+                        "min": 0, 
+                        "max": 5 
                     }
                 },
                 {
@@ -49,14 +50,14 @@
                         "worry"
                     ],
                     "prompt": "The user is worried about {answer}.",
+                    "type": "checkbox",
                     "options": {
-                        "type": "checkbox",
                         "values": [
                             "Work",
                             "Family",
                             "Money"
                         ],
-                        "multiselect": true
+                        "multiselect": true 
                     }
                 },
                 {
@@ -66,13 +67,13 @@
                         "location"
                     ],
                     "prompt": "The user's residence is in {location}.",
+                    "type": "open", 
                     "options": {
-                        "type": "open",
-                        "max_len": 120,
-                        "match": "/.+/g",
+                        "max_len": 120, 
+                        "match": "/.+/g", 
                         "multiline": true
                     },
-                    "required": true
+                    "required": true 
                 },
                 {
                     "id": "1.4",
@@ -81,11 +82,11 @@
                         "useless"
                     ],
                     "prompt": "Here's a useless random number: {answer}. It's not actually random if it's {default}. Keep it safe!",
+                    "type": "number", 
                     "options": {
-                        "type": "number",
-                        "min": 0,
-                        "max": 666,
-                        "default": 42
+                        "min": 0, 
+                        "max": 666, 
+                        "default": 42 
                     }
                 }
             ]
