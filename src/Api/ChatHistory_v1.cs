@@ -1,7 +1,6 @@
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Roles;
 using Aire.Sdk.Auth.Scopes;
 using Aire.Sdk.Auth.Services;
 using Microsoft.AspNetCore.Http;
