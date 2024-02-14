@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aire.Sdk.AspNetCore", "subm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aire.Sdk.Azure", "submodules\aire-dotnet-sdk\Aire.Sdk.Azure\Aire.Sdk.Azure.csproj", "{27071E44-B9D0-41DE-96C0-2401FC59DD1C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aire.Sdk.Models", "submodules\aire-dotnet-sdk\Aire.Sdk.Models\Aire.Sdk.Models.csproj", "{DA10755B-FB62-46BF-987F-54F4F0D43EED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +45,10 @@ Global
 		{27071E44-B9D0-41DE-96C0-2401FC59DD1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{27071E44-B9D0-41DE-96C0-2401FC59DD1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{27071E44-B9D0-41DE-96C0-2401FC59DD1C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA10755B-FB62-46BF-987F-54F4F0D43EED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA10755B-FB62-46BF-987F-54F4F0D43EED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA10755B-FB62-46BF-987F-54F4F0D43EED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA10755B-FB62-46BF-987F-54F4F0D43EED}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -56,5 +62,6 @@ Global
 		{5B3F939F-D32D-48DF-BA74-F1425435C3D3} = {0B46259A-CBDD-40B7-B011-0631C9022522}
 		{29973BC4-2E85-4037-82D4-4B48CA75C630} = {0B46259A-CBDD-40B7-B011-0631C9022522}
 		{27071E44-B9D0-41DE-96C0-2401FC59DD1C} = {0B46259A-CBDD-40B7-B011-0631C9022522}
+		{DA10755B-FB62-46BF-987F-54F4F0D43EED} = {0B46259A-CBDD-40B7-B011-0631C9022522}
 	EndGlobalSection
 EndGlobal

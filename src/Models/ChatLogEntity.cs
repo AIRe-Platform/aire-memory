@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Aire.Sdk.Helpers;
+using Aire.Sdk.Models.Chat;
 
 namespace Aire.Memory.Models
 {

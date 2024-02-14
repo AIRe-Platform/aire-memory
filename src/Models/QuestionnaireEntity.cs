@@ -1,4 +1,5 @@
 using Aire.Sdk.Helpers;
+using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models
 {
@@ -23,6 +24,19 @@ namespace Aire.Memory.Models
             Keywords = questionnaire.Keywords;
             Preliminary = questionnaire.Preliminary?.ObjectToJson();
             Content = questionnaire.Content?.ObjectToJson();
+        }
+
+        public Questionnaire ToModel()
+        {
+            return new Questionnaire {
+                Id = Id,
+                Name = Name,
+                Lang = Lang,
+                Modified = Modified,
+                Keywords = Keywords,
+                Preliminary = Preliminary?.JsonToObject<Preliminary>(),
+                Content = Content?.JsonToObject<List<QuestionnaireContent>>()
+            };
         }
     }
 }

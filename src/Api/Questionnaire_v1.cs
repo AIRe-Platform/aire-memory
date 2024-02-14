@@ -1,17 +1,18 @@
-using Aire.Memory.Models;
-using Aire.Sdk.AspNetCore;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Scopes;
-using Aire.Sdk.Auth.Services;
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Net;
+using Microsoft.OpenApi.Models;
+using Aire.Memory.Models;
+using Aire.Sdk.AspNetCore;
+using Aire.Sdk.Auth.Models;
+using Aire.Sdk.Auth.Scopes;
+using Aire.Sdk.Auth.Services;
+using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Api
 {
@@ -55,7 +56,7 @@ namespace Aire.Memory.Api
             var questionnaires = new List<Questionnaire>();
             foreach (var item in list)
             {
-                questionnaires.Add(new Questionnaire(item));
+                questionnaires.Add(item.ToModel());
             }
 
             return new ObjectResult(questionnaires);
@@ -96,7 +97,7 @@ namespace Aire.Memory.Api
             if(ent == null)
                 return new NotFoundResult();
 
-            var questionnaire = new Questionnaire(ent);
+            var questionnaire = ent.ToModel();
 
             return new ObjectResult(questionnaire);
         }
@@ -113,7 +114,7 @@ namespace Aire.Memory.Api
             BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "A questionnaire", Required = true)]
-        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Saved questionnaire")]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Saved questionnaire")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> PostQuestionnaire(

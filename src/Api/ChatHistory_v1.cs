@@ -1,17 +1,18 @@
-using Aire.Memory.Models;
-using Aire.Sdk.AspNetCore;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Scopes;
-using Aire.Sdk.Auth.Services;
+using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Net;
+using Microsoft.OpenApi.Models;
+using Aire.Memory.Models;
+using Aire.Sdk.AspNetCore;
+using Aire.Sdk.Auth.Models;
+using Aire.Sdk.Auth.Scopes;
+using Aire.Sdk.Auth.Services;
+using Aire.Sdk.Models.Chat;
 
 namespace Aire.Memory.Api
 {
