@@ -70,7 +70,7 @@ namespace Aire.Memory.Api
             BearerFormat = "JWT", 
             Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", In = ParameterLocation.Path, Required = true)]
-        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ChatMessage>), Description = "List of chat messages")]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogWrapper), Description = "List of chat messages and chat state")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found.")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
@@ -94,7 +94,15 @@ namespace Aire.Memory.Api
             if(chatlog == null)
                 return new NotFoundResult();
 
-            return new ObjectResult(chatlog);
+            var chatState = ent?.GetChatState(auth!.UserKey);
+
+            var result = new ChatLogWrapper
+            {
+                Messages = chatlog,
+                State = chatState
+            };
+
+            return new ObjectResult(result);
         }
 
         [Function("PostChatHistory_v1")]
@@ -108,7 +116,7 @@ namespace Aire.Memory.Api
             Scheme = OpenApiSecuritySchemeType.Bearer, 
             BearerFormat = "JWT", 
             Description = "User token")]
-        [OpenApiRequestBody("application/json", typeof(List<ChatMessage>), Description = "List of chat messages", Required = true)]
+        [OpenApiRequestBody("application/json", typeof(ChatLogWrapper), Description = "List of chat messages", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
@@ -120,8 +128,8 @@ namespace Aire.Memory.Api
             if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
                 return new UnauthorizedResult();
 
-            var chat = await req.ReadJson<List<ChatMessage>>();
-            if(chat == null)
+            var chatLogWrapper = await req.ReadJson<ChatLogWrapper>();
+            if(chatLogWrapper == null)
                 return new BadRequestResult();
 
             var entity = new ChatLogEntity
@@ -129,7 +137,7 @@ namespace Aire.Memory.Api
                 UserId = auth!.User,
                 Timestamp = DateTime.UtcNow
             };
-            entity.SetChatLog(auth!.UserKey, chat);
+            entity.SetChatLog(auth!.UserKey, chatLogWrapper.Messages);
             
             var add = await _db.ChatLogs.AddAsync(entity);
             await add.Context.SaveChangesAsync();
@@ -150,7 +158,7 @@ namespace Aire.Memory.Api
             BearerFormat = "JWT", 
             Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", Required = true)]
-        [OpenApiRequestBody("application/json", typeof(List<ChatMessage>), Description = "List of chat messages", Required = true)]
+        [OpenApiRequestBody("application/json", typeof(ChatLogWrapper), Description = "List of chat messages", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
@@ -167,8 +175,8 @@ namespace Aire.Memory.Api
             if(!Guid.TryParse(id, out Guid chatId))
                 return new BadRequestResult();
 
-            var messages = await req.ReadJson<List<ChatMessage>>();
-            if(messages == null)
+            var chatLogWrapper = await req.ReadJson<ChatLogWrapper>();
+            if(chatLogWrapper == null)
                 return new BadRequestResult();
 
             var chatlog = await _db.ChatLogs
@@ -178,8 +186,12 @@ namespace Aire.Memory.Api
             if(chatlog == null)
                 return new NotFoundResult();
 
-            chatlog.SetChatLog(auth!.UserKey, messages);
+            chatlog.SetChatLog(auth!.UserKey, chatLogWrapper.Messages);
             chatlog.Timestamp = DateTime.UtcNow;
+
+            if(chatLogWrapper.State != null) {
+                chatlog.SetChatState(auth!.UserKey, chatLogWrapper.State);
+            }
 
             var update = _db.ChatLogs.Update(chatlog);
             await update.Context.SaveChangesAsync();
