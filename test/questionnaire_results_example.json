@@ -1,0 +1,26 @@
+{
+    "id": "3cd2085c-de4b-4d78-a68d-7b7d711c4f51",
+    "questionnaire_id": "34f79a6c-ef2b-4d4c-94a2-a39f5591d44d", 
+    "timestamp": "2020-01-01T00:00:00.000Z", 
+    "preliminary": { 
+        "age": "56",
+        "gender": "male"
+    },
+    "answers": [
+        {
+            "question_id": "aa4230ba-a7e9-4b53-81d8-11db61d3065e",
+            "type": "range",
+            "question": "How happy are you",
+            "prompt": "The user ranks his/her happiness as 3 on a scale from 0 to 5.",
+            "answer": 3,
+            "options": {
+                "min": 0,
+                "max": 5
+            }
+        }
+    ],
+    "summary": "The user thinks they are neither happy or sad. The random number is 69.",
+    "prompts": [
+        "The user ranks his/her happiness as 3 on a scale from 0 to 5."
+    ]
+}

@@ -3,6 +3,7 @@ using System;
 using Aire.Memory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aire.Memory.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20240220135140_CreateQuestionnaireResults")]
+    partial class CreateQuestionnaireResults
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -32,10 +35,6 @@ namespace Aire.Memory.Migrations
                     b.Property<string>("EncryptedChatLog")
                         .HasColumnType("text")
                         .HasColumnName("encrypted_chat_log");
-
-                    b.Property<string>("EncryptedChatState")
-                        .HasColumnType("text")
-                        .HasColumnName("encrypted_chat_state");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone")
