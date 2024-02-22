@@ -67,7 +67,7 @@ namespace Aire.Memory.Api
 
             var questionnaireResults = ent.ToModel(auth!.UserKey);
 
-            return new ObjectResult(questionnaireResults);
+            return new OkObjectResult(questionnaireResults);
         }
 
         [Function("PostQuestionnaireResults_v1")]
@@ -111,7 +111,8 @@ namespace Aire.Memory.Api
             var add = await _db.QuestionnaireResults.AddAsync(entity);
             await add.Context.SaveChangesAsync();
 
-            return new ObjectResult(questionnaireResults);
+            questionnaireResults.Id = entity.Id.ToString();
+            return new OkObjectResult(questionnaireResults);
         }
     }
 }

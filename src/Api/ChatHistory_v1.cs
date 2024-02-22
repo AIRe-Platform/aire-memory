@@ -31,14 +31,14 @@ namespace Aire.Memory.Api
 
         [Function("GetChatHistory_v1")]
         [OpenApiOperation(
-            operationId: "getChatHistory", 
-            tags: ["chat-history"], 
+            operationId: "getChatHistory",
+            tags: ["chat-history"],
             Summary = "Get a list of chat logs")]
         [OpenApiSecurity(
-            schemeName: "bearer_auth", 
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ChatLogMetadata>), Description = "List of chat metadata objects")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
@@ -47,7 +47,7 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
                 return new UnauthorizedResult();
 
             var list = await _db.ChatLogs
@@ -60,17 +60,17 @@ namespace Aire.Memory.Api
 
         [Function("GetChatHistoryWithId_v1")]
         [OpenApiOperation(
-            operationId: "getChatHistoryWithId", 
-            tags: ["chat-history"], 
+            operationId: "getChatHistoryWithId",
+            tags: ["chat-history"],
             Summary = "Retrieve a chat log")]
         [OpenApiSecurity(
-            schemeName: "bearer_auth", 
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", In = ParameterLocation.Path, Required = true)]
-        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogWrapper), Description = "List of chat messages and chat state")]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLog), Description = "List of chat messages and chat state")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found.")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
@@ -80,43 +80,35 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
                 return new UnauthorizedResult();
 
-            if(!Guid.TryParse(id, out Guid chatId))
+            if (!Guid.TryParse(id, out Guid chatId))
                 return new BadRequestResult();
 
             var ent = await _db.ChatLogs
                 .Where(x => x.UserId == auth!.User && x.Id == chatId)
                 .FirstOrDefaultAsync();
 
-            var chatlog = ent?.GetChatLog(auth!.UserKey);
-            if(chatlog == null)
+            var chat = ent?.GetChatLog(auth!.UserKey);
+            if (chat == null)
                 return new NotFoundResult();
 
-            var chatState = ent?.GetChatState(auth!.UserKey);
-
-            var result = new ChatLogWrapper
-            {
-                Messages = chatlog,
-                State = chatState
-            };
-
-            return new ObjectResult(result);
+            return new ObjectResult(chat);
         }
 
         [Function("PostChatHistory_v1")]
         [OpenApiOperation(
-            operationId: "postChatHistory", 
-            tags: ["chat-history"], 
+            operationId: "postChatHistory",
+            tags: ["chat-history"],
             Summary = "Store new chat log")]
         [OpenApiSecurity(
-            schemeName: "bearer_auth", 
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
-        [OpenApiRequestBody("application/json", typeof(ChatLogWrapper), Description = "List of chat messages", Required = true)]
+        [OpenApiRequestBody("application/json", typeof(ChatLog), Description = "List of chat messages and chat state", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
@@ -125,11 +117,11 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
                 return new UnauthorizedResult();
 
-            var chatLogWrapper = await req.ReadJson<ChatLogWrapper>();
-            if(chatLogWrapper == null)
+            var chat = await req.ReadJson<ChatLog>();
+            if (chat == null)
                 return new BadRequestResult();
 
             var entity = new ChatLogEntity
@@ -137,8 +129,8 @@ namespace Aire.Memory.Api
                 UserId = auth!.User,
                 Timestamp = DateTime.UtcNow
             };
-            entity.SetChatLog(auth!.UserKey, chatLogWrapper.Messages);
-            
+            entity.SetChatLog(auth!.UserKey, chat);
+
             var add = await _db.ChatLogs.AddAsync(entity);
             await add.Context.SaveChangesAsync();
 
@@ -148,17 +140,17 @@ namespace Aire.Memory.Api
 
         [Function("PutChatHistory_v1")]
         [OpenApiOperation(
-            operationId: "putChatHistory", 
-            tags: ["chat-history"], 
+            operationId: "putChatHistory",
+            tags: ["chat-history"],
             Summary = "Edit existing chat log")]
         [OpenApiSecurity(
-            schemeName: "bearer_auth", 
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", Required = true)]
-        [OpenApiRequestBody("application/json", typeof(ChatLogWrapper), Description = "List of chat messages", Required = true)]
+        [OpenApiRequestBody("application/json", typeof(ChatLog), Description = "List of chat messages and chat state", Required = true)]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLogMetadata), Description = "Chat log metadata")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
@@ -169,29 +161,25 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
                 return new UnauthorizedResult();
 
-            if(!Guid.TryParse(id, out Guid chatId))
+            if (!Guid.TryParse(id, out Guid chatId))
                 return new BadRequestResult();
 
-            var chatLogWrapper = await req.ReadJson<ChatLogWrapper>();
-            if(chatLogWrapper == null)
+            var chat = await req.ReadJson<ChatLog>();
+            if (chat == null)
                 return new BadRequestResult();
 
             var chatlog = await _db.ChatLogs
                 .Where(x => x.Id == chatId && x.UserId == auth!.User)
                 .FirstOrDefaultAsync();
 
-            if(chatlog == null)
+            if (chatlog == null)
                 return new NotFoundResult();
 
-            chatlog.SetChatLog(auth!.UserKey, chatLogWrapper.Messages);
+            chatlog.SetChatLog(auth!.UserKey, chat);
             chatlog.Timestamp = DateTime.UtcNow;
-
-            if(chatLogWrapper.State != null) {
-                chatlog.SetChatState(auth!.UserKey, chatLogWrapper.State);
-            }
 
             var update = _db.ChatLogs.Update(chatlog);
             await update.Context.SaveChangesAsync();
@@ -201,14 +189,14 @@ namespace Aire.Memory.Api
 
         [Function("DeleteChatHistory_v1")]
         [OpenApiOperation(
-            operationId: "deleteChatHistory", 
-            tags: ["chat-history"], 
+            operationId: "deleteChatHistory",
+            tags: ["chat-history"],
             Summary = "Delete entire chat history")]
         [OpenApiSecurity(
-            schemeName: "bearer_auth", 
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlog(s) removed successfully")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
@@ -219,14 +207,14 @@ namespace Aire.Memory.Api
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
                 return new UnauthorizedResult();
 
             var history = await _db.ChatLogs
                 .Where(x => x.UserId == auth!.User)
                 .ToListAsync();
 
-            foreach(var chat in history)
+            foreach (var chat in history)
             {
                 _db.ChatLogs.Remove(chat);
             }
@@ -237,14 +225,14 @@ namespace Aire.Memory.Api
 
         [Function("DeleteChatHistoryWithId_v1")]
         [OpenApiOperation(
-            operationId: "deleteChatHistoryWithId", 
-            tags: ["chat-history"], 
+            operationId: "deleteChatHistoryWithId",
+            tags: ["chat-history"],
             Summary = "Delete a chat log")]
         [OpenApiSecurity(
             schemeName: "bearer_auth",
-            schemeType: SecuritySchemeType.Http, 
-            Scheme = OpenApiSecuritySchemeType.Bearer, 
-            BearerFormat = "JWT", 
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiParameter("id", Description = "Chat log identifier", In = ParameterLocation.Path, Required = true)]
         [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlog(s) removed successfully")]
@@ -257,17 +245,17 @@ namespace Aire.Memory.Api
             string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
-            if(!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
                 return new UnauthorizedResult();
 
-            if(!Guid.TryParse(id, out Guid chatId))
+            if (!Guid.TryParse(id, out Guid chatId))
                 return new BadRequestResult();
 
             var chat = await _db.ChatLogs
                 .Where(x => x.UserId == auth!.User && x.Id == chatId)
                 .FirstOrDefaultAsync();
 
-            if(chat == null)
+            if (chat == null)
                 return new NotFoundResult();
 
             _db.ChatLogs.Remove(chat);

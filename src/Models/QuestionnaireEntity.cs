@@ -13,6 +13,8 @@ namespace Aire.Memory.Models
         public string? Preliminary { get; set; }
         public string? Content { get; set; }
 
+        public Guid? EmbeddingId { get; set; }
+
         public QuestionnaireEntity() { }
 
         public QuestionnaireEntity(Questionnaire questionnaire)

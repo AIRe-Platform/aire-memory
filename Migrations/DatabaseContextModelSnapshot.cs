@@ -62,6 +62,10 @@ namespace Aire.Memory.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content");
 
+                    b.Property<Guid?>("EmbeddingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("embedding_id");
+
                     b.Property<string[]>("Keywords")
                         .HasColumnType("text[]")
                         .HasColumnName("keywords");

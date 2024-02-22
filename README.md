@@ -25,6 +25,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AzureWebJobsStorage": "",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
         "AirePlatformService": "http://localhost:7071/api",
+        "AIRE_SERVICE_KEY": "<service key secret>",
         "TokenSigningKey": "<signing key shared between platform modules>",
         "TokenEncryptionKey": "<enryption key shared between platform modules>",
         "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=..."

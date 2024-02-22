@@ -1,19 +1,20 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Aire.Memory.Migrations
 {
     /// <inheritdoc />
-    public partial class AddChatState : Migration
+    public partial class AddQuestionnaireEmbeddingId : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "encrypted_chat_state",
-                table: "ChatLogs",
-                type: "text",
+            migrationBuilder.AddColumn<Guid>(
+                name: "embedding_id",
+                table: "Questionnaires",
+                type: "uuid",
                 nullable: true);
         }
 
@@ -21,8 +22,8 @@ namespace Aire.Memory.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "encrypted_chat_state",
-                table: "ChatLogs");
+                name: "embedding_id",
+                table: "Questionnaires");
         }
     }
 }

@@ -1,14 +1,14 @@
 {
-    "id": "d65b8044-3679-4cdf-8422-0f472aec6edb", 
-    "name": "My Survey",
+    "id": "f65b8044-3679-4cdf-8422-0f472aec6edb", 
+    "name": "Pain management",
     "lang": "en", 
-    "modified": "2020-01-01T00:00:00.000Z", 
+    "modified": "2024-02-22T00:00:00.000Z", 
     "keywords": [
         "quality of life",
-        "mental health"
+        "pain management",
+        "physical therapy"
     ], 
     "preliminary": { 
-
         "properties": {
             "age": {
                 "type": "integer"
@@ -23,19 +23,13 @@
     },
     "content": [ 
         {
-            "id": "1",
-            "name": "Mental Health",
-            "keywords": [
-                "mental health"
-            ], 
+            "id": "test_questions",
+            "name": "Test questions",
             "questions": [ 
                 {
-                    "id": "1.1", 
-                    "question": "How happy are you?", 
-                    "keywords": [
-                        "happiness"
-                    ], 
-                    "prompt": "The user ranks his/her happiness as {answer} on a scale from {min} to {max}.", 
+                    "id": "test_question_1", 
+                    "question": "How severe would you rank the pain you are experiencing?",
+                    "prompt": "The user ranks their pain as {answer} on a scale from {min} to {max}.", 
                     "type": "range", 
                     "options": {
                         "min": 0, 
@@ -43,30 +37,24 @@
                     }
                 },
                 {
-                    "id": "1.2",
-                    "question": "I am worried about...",
-                    "keywords": [
-                        "stress",
-                        "worry"
-                    ],
-                    "prompt": "The user is worried about {answer}.",
+                    "id": "test_question_2",
+                    "question": "I have tried...",
+                    "prompt": "The user has tried {answer}.",
                     "type": "checkbox",
                     "options": {
                         "values": [
-                            "Work",
-                            "Family",
-                            "Money"
+                            "Pain medication",
+                            "Stretching",
+                            "Swearing and complaining",
+                            "Contacting a professional"
                         ],
                         "multiselect": true 
                     }
                 },
                 {
-                    "id": "1.3",
-                    "question": "Please enter the country you live in",
-                    "keywords": [
-                        "location"
-                    ],
-                    "prompt": "The user's residence is in {location}.",
+                    "id": "test_question_3",
+                    "question": "Please explain how and when the pain started.",
+                    "prompt": "{answer}",
                     "type": "open", 
                     "options": {
                         "max_len": 120, 
@@ -76,17 +64,14 @@
                     "required": true 
                 },
                 {
-                    "id": "1.4",
-                    "question": "Enter a number",
-                    "keywords": [
-                        "useless"
-                    ],
-                    "prompt": "Here's a useless random number: {answer}. It's not actually random if it's {default}. Keep it safe!",
+                    "id": "test_question_4",
+                    "question": "How many hours you exercise in a week?",
+                    "prompt": "The user says they exercise {answer} hours weekly.",
                     "type": "number", 
                     "options": {
                         "min": 0, 
-                        "max": 666, 
-                        "default": 42 
+                        "max": 100, 
+                        "default": 6 
                     }
                 }
             ]

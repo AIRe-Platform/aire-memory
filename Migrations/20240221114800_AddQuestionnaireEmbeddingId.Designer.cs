@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aire.Memory.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20240220142258_AddChatState")]
-    partial class AddChatState
+    [Migration("20240221114800_AddQuestionnaireEmbeddingId")]
+    partial class AddQuestionnaireEmbeddingId
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -35,10 +35,6 @@ namespace Aire.Memory.Migrations
                     b.Property<string>("EncryptedChatLog")
                         .HasColumnType("text")
                         .HasColumnName("encrypted_chat_log");
-
-                    b.Property<string>("EncryptedChatState")
-                        .HasColumnType("text")
-                        .HasColumnName("encrypted_chat_state");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone")
@@ -64,6 +60,10 @@ namespace Aire.Memory.Migrations
                     b.Property<string>("Content")
                         .HasColumnType("text")
                         .HasColumnName("content");
+
+                    b.Property<Guid?>("EmbeddingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("embedding_id");
 
                     b.Property<string[]>("Keywords")
                         .HasColumnType("text[]")
