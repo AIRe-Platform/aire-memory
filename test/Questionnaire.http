@@ -19,7 +19,7 @@ Authorization: Bearer {{token}}
 
 
 ### Query questionnaires
-@query = mental health, quality of life
+@query = pain
 GET {{base_url}}/v1/questionnaire?query={{query}} HTTP/1.1
 Accept: application/json
 Authorization: Bearer {{token}}
