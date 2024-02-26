@@ -142,8 +142,9 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> QueryQuestionnaire(
             [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/questionnaire")] HttpRequest req,
-            [FromQuery(Name = "query")] string query,
-            FunctionContext context)
+            FunctionContext context,
+            [FromQuery] string query,
+            [FromQuery] string? lang = null)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
             if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
@@ -161,16 +162,23 @@ namespace Aire.Memory.Api
             _aiService.UseModule(module, new UserServiceCredentials { Token = auth!.JwtEncodedToken });
 
             var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var results = await _aiService.QueryQuestionnaires(queryWords);
-            var id = results?.Results?.FirstOrDefault();
+            var queryResponse = await _aiService.QueryQuestionnaires(queryWords);
 
-            if (id == null)
+            if (queryResponse == null || queryResponse.Results == null)
                 return new NotFoundResult();
 
-            var questionnaireId = Guid.Parse(id);
+            var questionnaireId = queryResponse.Results
+                .Where(x => x.Relevance.HasValue && x.Relevance.Value > 0.7)
+                .Where(x => string.IsNullOrEmpty(lang) || lang == x.Language)
+                .Select(x => x.Source)
+                .FirstOrDefault();
 
+            if(questionnaireId == null)
+                return new NotFoundResult();
+
+            var entId = Guid.Parse(questionnaireId);
             var ent = await _db.Questionnaires
-                .Where(x => x.Id == questionnaireId)
+                .Where(x => x.Id == entId)
                 .FirstOrDefaultAsync();
 
             if (ent == null)
