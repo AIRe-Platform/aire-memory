@@ -8,19 +8,6 @@
         "pain management",
         "physical therapy"
     ], 
-    "preliminary": { 
-        "properties": {
-            "age": {
-                "type": "integer"
-            },
-            "gender": {
-                "type": "string"
-            }
-        },
-        "required": [
-            "age"
-        ]
-    },
     "content": [ 
         {
             "id": "test_questions",

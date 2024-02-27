@@ -43,7 +43,6 @@ namespace Aire.Memory.Models
                 Id = Id.ToString(),
                 QuestionnaireId = QuestionnaireId.ToString(),
                 Timestamp = Timestamp,
-                Preliminary = questionnaireResultsContent?.Preliminary,
                 Answers = questionnaireResultsContent?.Answers,
                 Summary = questionnaireResultsContent?.Summary,
                 Prompts = questionnaireResultsContent?.Prompts

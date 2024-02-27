@@ -10,7 +10,6 @@ namespace Aire.Memory.Models
         public string? Lang { get; set; }
         public DateTime Modified { get; set; }
         public string[]? Keywords { get; set; }
-        public string? Preliminary { get; set; }
         public string? Content { get; set; }
 
         public Guid? EmbeddingId { get; set; }
@@ -24,7 +23,6 @@ namespace Aire.Memory.Models
             Lang = questionnaire.Lang;
             Modified = questionnaire.Modified;
             Keywords = questionnaire.Keywords;
-            Preliminary = questionnaire.Preliminary?.ObjectToJson();
             Content = questionnaire.Content?.ObjectToJson();
         }
 
@@ -36,7 +34,6 @@ namespace Aire.Memory.Models
                 Lang = Lang,
                 Modified = Modified,
                 Keywords = Keywords,
-                Preliminary = Preliminary?.JsonToObject<Preliminary>(),
                 Content = Content?.JsonToObject<List<QuestionnaireContent>>()
             };
         }
