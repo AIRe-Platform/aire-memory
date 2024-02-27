@@ -136,6 +136,15 @@ namespace Aire.Memory.Api
             BearerFormat = "JWT",
             Description = "User token")]
         [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "A questionnaire", Required = true)]
+        [OpenApiParameter("query", 
+            CollectionDelimiter = OpenApiParameterCollectionDelimiterType.Comma, 
+            In = ParameterLocation.Query, 
+            Required = true,
+            Description = "List of keywords separated by commas")]
+        [OpenApiParameter("lang",
+            In = ParameterLocation.Query,
+            Required = false,
+            Description = "Set to return questionnaires in a specific language")]
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Best matching questionnaire")]
         [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
