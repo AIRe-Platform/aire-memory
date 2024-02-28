@@ -46,9 +46,9 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> GetQuestionnaireResults(
-                    [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
-                    FunctionContext context,
-                    string id)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
+            FunctionContext context,
+            string id)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
             if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
@@ -86,7 +86,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> PostQuestionnaireResults(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/questionnaire-results")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire-results")] HttpRequest req,
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();

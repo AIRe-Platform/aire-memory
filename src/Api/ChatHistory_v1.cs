@@ -43,7 +43,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ChatLogMetadata>), Description = "List of chat metadata objects")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> GetChatHistory(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/chat-history")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/chat-history")] HttpRequest req,
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
@@ -75,7 +75,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> GetChatHistoryWithId(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/chat-history/{id}")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/chat-history/{id}")] HttpRequest req,
             FunctionContext context,
             string id)
         {
@@ -113,7 +113,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> PostChatHistory(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/chat-history")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/chat-history")] HttpRequest req,
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
@@ -156,7 +156,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> PutChatHistory(
-            [HttpTrigger(AuthorizationLevel.Function, "put", Route = "v1/chat-history/{id}")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/chat-history/{id}")] HttpRequest req,
             FunctionContext context,
             string id)
         {
@@ -203,7 +203,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> DeleteChatHistory(
-            [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "v1/chat-history")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/chat-history")] HttpRequest req,
             FunctionContext context)
         {
             var auth = context.Features.Get<JwtAuthFeature>();
@@ -240,7 +240,7 @@ namespace Aire.Memory.Api
         [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> DeleteChatHistoryWithId(
-            [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "v1/chat-history/{id}")] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/chat-history/{id}")] HttpRequest req,
             FunctionContext context,
             string id)
         {
