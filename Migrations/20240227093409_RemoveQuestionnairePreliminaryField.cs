@@ -13,10 +13,6 @@ namespace Aire.Memory.Migrations
             migrationBuilder.DropColumn(
                 name: "preliminary",
                 table: "Questionnaires");
-
-            migrationBuilder.DropColumn(
-                name: "encrypted_chat_state",
-                table: "ChatLogs");
         }
 
         /// <inheritdoc />
@@ -25,12 +21,6 @@ namespace Aire.Memory.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "preliminary",
                 table: "Questionnaires",
-                type: "text",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "encrypted_chat_state",
-                table: "ChatLogs",
                 type: "text",
                 nullable: true);
         }
