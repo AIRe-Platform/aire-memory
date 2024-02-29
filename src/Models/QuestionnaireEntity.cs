@@ -1,4 +1,5 @@
 using Aire.Sdk.Helpers;
+using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models
 {
@@ -9,8 +10,9 @@ namespace Aire.Memory.Models
         public string? Lang { get; set; }
         public DateTime Modified { get; set; }
         public string[]? Keywords { get; set; }
-        public string? Preliminary { get; set; }
         public string? Content { get; set; }
+
+        public Guid? EmbeddingId { get; set; }
 
         public QuestionnaireEntity() { }
 
@@ -21,8 +23,19 @@ namespace Aire.Memory.Models
             Lang = questionnaire.Lang;
             Modified = questionnaire.Modified;
             Keywords = questionnaire.Keywords;
-            Preliminary = questionnaire.Preliminary?.ObjectToJson();
             Content = questionnaire.Content?.ObjectToJson();
+        }
+
+        public Questionnaire ToModel()
+        {
+            return new Questionnaire {
+                Id = Id,
+                Name = Name,
+                Lang = Lang,
+                Modified = Modified,
+                Keywords = Keywords,
+                Content = Content?.JsonToObject<List<QuestionnaireContent>>()
+            };
         }
     }
 }

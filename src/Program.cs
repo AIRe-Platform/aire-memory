@@ -10,6 +10,8 @@ using Newtonsoft.Json;
 using Aire.Memory;
 using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Auth.Models;
+using Aire.Sdk.AI;
+using Aire.Sdk.Platform;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -20,6 +22,7 @@ var host = new HostBuilder()
         });
     })
     .ConfigureServices(services => {
+        services.AddHttpClient();
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
@@ -46,6 +49,15 @@ var host = new HostBuilder()
         });
 
         services.AddDbContext<DatabaseContext>();
+
+        services
+            .Configure<AirePlatformServiceConfiguration>(o => {
+                o.ServiceUrl = AireEnvironment.PlatformServiceUrl;
+                o.ServiceKey = AireEnvironment.ServiceKey;
+            })
+            .AddSingleton<IAirePlatformService, AirePlatformService>()
+            .AddScoped<IAireAiService, AireAiService>();
+
     })
     .Build();
 

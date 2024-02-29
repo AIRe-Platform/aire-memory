@@ -50,5 +50,8 @@
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Auth\Aire.Sdk.Auth.csproj" />
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Helpers\Aire.Sdk.Helpers.csproj" />
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.AspNetCore\Aire.Sdk.AspNetCore.csproj" />
+    <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Models\Aire.Sdk.Models.csproj" />
+    <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Platform\Aire.Sdk.Platform.csproj" />
+    <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.AI\Aire.Sdk.AI.csproj" />
   </ItemGroup>
 </Project>

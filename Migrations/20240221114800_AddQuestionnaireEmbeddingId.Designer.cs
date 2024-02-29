@@ -3,6 +3,7 @@ using System;
 using Aire.Memory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aire.Memory.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20240221114800_AddQuestionnaireEmbeddingId")]
+    partial class AddQuestionnaireEmbeddingId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -78,39 +81,14 @@ namespace Aire.Memory.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("Preliminary")
+                        .HasColumnType("text")
+                        .HasColumnName("preliminary");
+
                     b.HasKey("Id")
                         .HasName("pk_questionnaires");
 
                     b.ToTable("Questionnaires", (string)null);
-                });
-
-            modelBuilder.Entity("Aire.Memory.Models.QuestionnaireResultsEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("EncryptedQuestionnaireResults")
-                        .HasColumnType("text")
-                        .HasColumnName("encrypted_questionnaire_results");
-
-                    b.Property<Guid?>("QuestionnaireId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("questionnaire_id");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_questionnaire_results");
-
-                    b.ToTable("QuestionnaireResults", (string)null);
                 });
 #pragma warning restore 612, 618
         }

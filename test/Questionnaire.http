@@ -1,8 +1,15 @@
 @base_url = http://localhost:7073/api
 
-@token = eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.NfGZ91olG6oJSq4lukcU5jpiDCirq9avPiwi7R3-nGYaYPIhYOQCJOHxod_WI30eb0ktfrgMJFLl0q2BhdA_xmw5KKBFT-kv.TrNHDKSIAWyCyV2Y3OVVDA.ZBLd2jit_xXofKppZ5fMW-r1Ke8zCDHKmMISTnYz9quZoCrsbTvbCGyP0DfFmq7g1ILIq3Dak-GlCL-t-2SGTKbmINjJ5OrHeN0CGi2rV4fitD3vK-A1T-1Nchc0rIg43R4t8OVrVApBzsipKC6yqyxb_NuPRu0SzrEJ8jYZyTePpNpFfFYriF3BAMrucRE2rRL0E8KWb1keopVzcM5AoGcb4Yeb8HpvXfntNY7xLCiDUXfd7sTlWKDRXCCWpB6lMFhI0nm-jBlpHmzjJ0NmlrudbjXiVwCh9rzcka3PJ3nMF1vxJF3pZfK7ECWAQIuztdTxEV54ReAwRAVFDzVcL6Wpl3fytC3ngTwVlCvU-rs0W4wm5d_FLuksnwPXNiNxrEm8ROfXMGLCwy9KKgQVTVWyao7h2h0-XFuPbP0rCfp7yxrI4M8UyhjkIRneZKg-7mFTH4TVvdqSux9ZPfv9V_jbN9mRhCLiNLkE8oZhVGbc3NRbLDpAz36Z3orSbpdbK6_8rTinwfvH717W-Z4AGc12dOBCROl2bjH0eupz0Sql3X1ZYuL9gDv8eAbWAcmc-tycsdNY_cjysR-fKYXJs04-ekGFSoHEqk_q8nvYP4nPoVWphJiA7_QFYQ0RH6ELWKxNz7uqL01Q4PsbTJffTWR3NWd9C2azjUez-V9yQ2dUdERY2VRLX-2wdsrZk8GBfAqyd5HF2e2ZZUyLKiEdK37PDCslcapk2N4w4vkrZKsng5EHPXqczECNjHpLcRCcP5TuXHXnk37NJTHlfXjKHdXQMqlgxOSFCRuZzs-BNhiiz-vLB-iX9Gq2sSvhEtnPrb5xI_wV_lY0Tj4GhPptAmwnv2yp7finBJ5YfT6aDvfOiPYnG6Sez5nnguuNBjNyMlm5yo9X9RIuFD4tMxZj1oGvmkGXRMZDjpX6IGFxGgtskniuXhKPqDTyc0WW8cIR.SxRBPIETDSfRdbbdpoRELpFvKJc6JA98zdFWuqsLg4M
+@token=eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.ugLQSgzMWZSIfJMTHFkiAuD5mKwo-EGrWH8zLKl79ODUzy8NIcQ-Mos8VO01VZJlE8_nvLc9T0YH1zNlsupZkabnxJd-_mDq.5Z1bhnf3lUZdgRcd-SKbag.qe4emQ_l-yYA8SKmiuz0i_rQgpojVMfTZp6Sb_TxE_y6XKAjzeNa8WnrfHw8Sqlbu_4h_YHZ_9npQpb1on-yySaoIqmjie2dp-BGVOojwSEdURwvfs9Oc4Uu3LXQAVH0VzJUOPJKc9CNTlQszXXnO9DivWnGYQPw5wqfBe8x85f4mIlEMPJmXGdlvnN5B34OUrRQN0D4EEIrsCeeheGbppe-_G-WOClLvUL168CCufxTxNRgDtjEid_KG0nAUzxyX5sFlNquzAMmMmJFsZUvBEj6ueHTRU-VVLCjn9QlaI-WZe4_ZO8VZu_7i0uKbEER4zbakRRh9PljD0RF2Ri-ochLX9hB37VaCrNgyVm_geznHsn3S_EVHaDSBmVgLJMpOsp-MbBsQavl9REpmitTvJsQyTYcjLVb5nTmRf5A2minWdbOTOdvJcaiErilrPyocFBs-2hgMcCuiTZLVtsrcId5AJCNvhO4PWizOj260IpJe8NUhlHQP-y703x4VU25jMez0XqOrZnnmM7uPsG5md0owGyTGXIbXcG0tNiQvFKXxQ9c_whlz1tnzKXI2Zm_WYo3b2F4zIOhdHK02n0FJHI2JIU4n9vG5uNeN6NzZq7FVW5dzXzC0T6Ke9OT3_a2kAGUebVI6Bj4EGP4VtquYdMm9rWgbxEU-uT78jVgn_gBnc8z2dqLCzBN6Ufj_fKdbkGgDViruR2uh7-N_g7NEvf8WP2stq7Gg_ddQxjMzvSOWkT2VDHeiB-IuVI_iOKqBWYms9ULWHBO9_FeUto4l4EDc7JTe3RaS-thLVa0cdur90sLh1srbYmaMmXCEw23HJ5gA__bIjyUh6eRxymn4YtAsr-ld0UldSDVJmlCrpzCftS49aALygil_vOkrqn4ZsHzcoIuvvA5wdysBFIxSoDSDikRrx4s67B69A16g5QOjmKSJlNKNABRyQVhNIJX_QezWJOgkk4DnVLDdB4lp7_CB8r7nY0nws3-oeUTd7YChhlmll8UeYp0FJLNWp9ecS-wLg9ONhI_lSJmYN6Lbu3tXVzIldLzT4xkXC25xak.rNkZ2TezK74uad4hPHUVFJw6cp5euyumFlqQfkSRsZQ
 
 @questionnaire_id = d65b8044-3679-4cdf-8422-0f472aec6edb
+
+### Get all questionnaires
+
+GET {{base_url}}/v1/questionnaires HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
 
 ### Get one example questionnaire
 
@@ -10,11 +17,14 @@ GET {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Get all questionnaires
 
-GET {{base_url}}/v1/questionnaire HTTP/1.1
+### Query questionnaires
+@query = pain
+@lang = fi
+GET {{base_url}}/v1/questionnaire?query={{query}}&lang={{lang}} HTTP/1.1
 Accept: application/json
 Authorization: Bearer {{token}}
+
 
 ### Post a questionnaire
 
@@ -24,3 +34,8 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 < ./questionnaire_example.json
+
+
+### Delete a questionnaire
+DELETE {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1
+Authorization: Bearer {{token}}
