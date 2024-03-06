@@ -9,10 +9,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Scopes;
-using Aire.Sdk.Auth.Services;
 using Aire.Sdk.Models.Chat;
+using Aire.Sdk.Auth;
 
 namespace Aire.Memory.Api
 {

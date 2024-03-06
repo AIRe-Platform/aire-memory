@@ -8,10 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using Aire.Memory;
+using Aire.Sdk.Auth;
 using Aire.Sdk.Auth.Extensions;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.AI;
 using Aire.Sdk.Platform;
+using Aire.Sdk.Platform.Clients;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -53,10 +53,10 @@ var host = new HostBuilder()
         services
             .Configure<AirePlatformServiceConfiguration>(o => {
                 o.ServiceUrl = AireEnvironment.PlatformServiceUrl;
-                o.ServiceKey = AireEnvironment.ServiceKey;
+                o.ServiceKey = AireEnvironment.PlatformServiceKey;
             })
             .AddSingleton<IAirePlatformService, AirePlatformService>()
-            .AddScoped<IAireAiService, AireAiService>();
+            .AddScoped<IAireClientFactory, AireClientFactory>();
 
     })
     .Build();
