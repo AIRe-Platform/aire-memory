@@ -1,4 +1,5 @@
 using System.Net;
+using System.Web.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -9,15 +10,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Scopes;
-using Aire.Sdk.Auth.Services;
+using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
-using Aire.Sdk.Platform;
-using Aire.Sdk.AI;
-using Aire.Sdk.Models.Platform;
-using Aire.Sdk.Models.Identity;
-using System.Web.Http;
+using Aire.Sdk.Platform.Clients;
 
 namespace Aire.Memory.Api
 {
@@ -25,29 +20,19 @@ namespace Aire.Memory.Api
     {
         private readonly DatabaseContext _db;
         private readonly IJwtTokenService _jwt;
-        private readonly IAirePlatformService _platformService;
-        private readonly IAireAiService _aiService;
+        private readonly IAireClientFactory _clientFactory;
         private readonly ILogger _log;
-
-        private readonly PlatformConfiguration _platform;
 
         public Questionnaire_v1(
             DatabaseContext db,
             IJwtTokenService jwt,
-            IAirePlatformService platformService,
-            IAireAiService aiService,
+            IAireClientFactory clientFactory,
             ILogger<Questionnaire_v1> log)
         {
             _db = db;
             _jwt = jwt;
-            _platformService = platformService;
-            _aiService = aiService;
+            _clientFactory = clientFactory;
             _log = log;
-
-            _platform = _platformService.GetPlatformConfiguration()
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
         }
 
         [Function("GetQuestionnaires_v1")]
@@ -162,16 +147,15 @@ namespace Aire.Memory.Api
             if (string.IsNullOrWhiteSpace(query))
                 return new BadRequestResult();
 
-            var module = _platform.GetDefaultModuleOfType(ModuleType.AI);
-            if (module == null)
+            var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+            if (aiService == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
-            _aiService.UseModule(module, new UserServiceCredentials { Token = auth!.JwtEncodedToken });
 
             var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var queryResponse = await _aiService.QueryQuestionnaires(queryWords);
+            var queryResponse = await aiService.QueryQuestionnaires(queryWords);
 
             if (queryResponse == null || queryResponse.Results == null)
                 return new NotFoundResult();
@@ -226,19 +210,18 @@ namespace Aire.Memory.Api
             if (questionnaire == null)
                 return new BadRequestResult();
 
-            var module = _platform.GetDefaultModuleOfType(ModuleType.AI);
-            if (module == null)
+            var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+            if (aiService == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
-            _aiService.UseModule(module, new UserServiceCredentials { Token = auth!.JwtEncodedToken });
 
             var entity = new QuestionnaireEntity(questionnaire);
             questionnaire.Id = entity.Id;
 
             {
-                var embedResult = await _aiService.EmbedQuestionnaire(questionnaire);
+                var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
                 var embedId = embedResult?.Ids?.FirstOrDefault();
                 if (embedId == null)
                 {
@@ -291,15 +274,14 @@ namespace Aire.Memory.Api
 
             if (ent.EmbeddingId != null)
             {
-                var module = _platform.GetDefaultModuleOfType(ModuleType.AI);
-                if (module == null)
+                var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+                if (aiService == null)
                 {
                     _log.LogCritical("Default AI module not configured");
                     return new InternalServerErrorResult();
                 }
-                _aiService.UseModule(module, new UserServiceCredentials { Token = auth!.JwtEncodedToken });
 
-                bool result = await _aiService.DeleteQuestionnaireEmbedding(ent.EmbeddingId.ToString()!);
+                bool result = await aiService.DeleteQuestionnaireEmbedding(ent.EmbeddingId.ToString()!);
                 if (!result)
                 {
                     _log.LogCritical("Failed to delete questionnaire embeddings");

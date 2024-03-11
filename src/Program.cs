@@ -3,15 +3,17 @@ using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using Aire.Memory;
+using Aire.Sdk.Auth;
 using Aire.Sdk.Auth.Extensions;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.AI;
 using Aire.Sdk.Platform;
+using Aire.Sdk.Platform.Clients;
+using Azure.Storage.Queues;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -28,6 +30,14 @@ var host = new HostBuilder()
 
         services.AddMvcCore().AddNewtonsoftJson(options => {
             options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
+        });
+
+        services.AddAzureClients(builder => {
+            builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
+                .ConfigureOptions(options => {
+                    options.MessageEncoding = QueueMessageEncoding.Base64;
+                })
+                .WithName("queue-client");
         });
 
         services.AddSingleton<IOpenApiConfigurationOptions>(_ => {
@@ -53,10 +63,10 @@ var host = new HostBuilder()
         services
             .Configure<AirePlatformServiceConfiguration>(o => {
                 o.ServiceUrl = AireEnvironment.PlatformServiceUrl;
-                o.ServiceKey = AireEnvironment.ServiceKey;
+                o.ServiceKey = AireEnvironment.PlatformServiceKey;
             })
             .AddSingleton<IAirePlatformService, AirePlatformService>()
-            .AddScoped<IAireAiService, AireAiService>();
+            .AddScoped<IAireClientFactory, AireClientFactory>();
 
     })
     .Build();

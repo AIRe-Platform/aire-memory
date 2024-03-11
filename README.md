@@ -23,12 +23,13 @@ You should create `local.settings.json` in the root of the repository when devel
     "IsEncrypted": false,
     "Values": {
         "AzureWebJobsStorage": "",
+        "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=...",
+        "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-        "AirePlatformService": "http://localhost:7071/api",
+        "AIRE_SERVICE_BASE": "http://localhost:7071/api",
         "AIRE_SERVICE_KEY": "<service key secret>",
-        "TokenSigningKey": "<signing key shared between platform modules>",
-        "TokenEncryptionKey": "<enryption key shared between platform modules>",
-        "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=..."
+        "TOKEN_ENCRYPTION_KEY": "<enryption key shared between platform modules>",
+        "TOKEN_SIGNING_KEY": "<signing key shared between platform modules>",
     },
     "Host": {
         "LocalHttpPort": 7073,
@@ -66,10 +67,12 @@ Run migrations on the database as instructed above.
 
 Publish the Fuctions app and then setup the following required environment values:
 
-- `AirePlatformService` The endpoint of the AIRe Services module.
-- `TokenSigningKey` The token signing key shared between the platform instance modules.
-- `TokenEncryptionKey` The token encryption key shared between the platform instance modules.
+- `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
+- `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
+- `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.
+- `TOKEN_ENCRYPTION_KEY` The token encryption key shared between the platform instance modules.
 - `DatabaseConnectionString` The connection string for a PostgreSql database.
+- `StorageConnectionString` Azure Table Storage connection string
 
 ## Disclaimer
 

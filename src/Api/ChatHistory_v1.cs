@@ -9,10 +9,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
-using Aire.Sdk.Auth.Models;
-using Aire.Sdk.Auth.Scopes;
-using Aire.Sdk.Auth.Services;
 using Aire.Sdk.Models.Chat;
+using Aire.Sdk.Auth;
 
 namespace Aire.Memory.Api
 {
@@ -198,9 +196,7 @@ namespace Aire.Memory.Api
             Scheme = OpenApiSecuritySchemeType.Bearer,
             BearerFormat = "JWT",
             Description = "User token")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlog(s) removed successfully")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlogs were removed successfully")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> DeleteChatHistory(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/chat-history")] HttpRequest req,
