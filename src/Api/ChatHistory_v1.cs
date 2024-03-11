@@ -196,9 +196,7 @@ namespace Aire.Memory.Api
             Scheme = OpenApiSecuritySchemeType.Bearer,
             BearerFormat = "JWT",
             Description = "User token")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlog(s) removed successfully")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
-        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "The chatlogs were removed successfully")]
         [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
         public async Task<IActionResult> DeleteChatHistory(
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/chat-history")] HttpRequest req,
