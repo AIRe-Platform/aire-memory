@@ -237,6 +237,46 @@ namespace Aire.Memory.Api
             return new ObjectResult(questionnaire);
         }
 
+        [Function("PutQuestionnaire_v1")]
+        [OpenApiOperation(
+            operationId: "putQuestionnaire",
+            tags: ["questionnaire"],
+            Summary = "Edit existing questionnaire")]
+        [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+        [OpenApiParameter("id", Description = "Questionnaire identifier", Required = true)]
+        [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "Questionnaire", Required = true)]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Questionnaire")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+        public async Task<IActionResult> PutQuestionnaire(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/questionnaire/{id}")] HttpRequest req,
+            FunctionContext context,
+            string id)
+        {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+                return new UnauthorizedResult();
+
+            if (!Guid.TryParse(id, out Guid questionnaireId))
+                return new BadRequestResult();
+
+            var questionnaire = await req.ReadJson<Questionnaire>();
+            if (questionnaire == null)
+                return new BadRequestResult();
+
+            var questionnaireEntity = new QuestionnaireEntity(questionnaire);
+            var update = _db.Questionnaires.Update(questionnaireEntity);
+            await update.Context.SaveChangesAsync();
+
+            return new ObjectResult(questionnaire);
+        }
+
         [Function("DeleteQuestionnaire_v1")]
         [OpenApiOperation(
             operationId: "deleteQuestionnaireWithId",
