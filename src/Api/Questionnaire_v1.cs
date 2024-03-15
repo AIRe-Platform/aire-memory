@@ -270,7 +270,17 @@ namespace Aire.Memory.Api
             if (questionnaire == null)
                 return new BadRequestResult();
 
+            var entity = await _db.Questionnaires
+                .Where(x => x.Id == questionnaireId)
+                .FirstOrDefaultAsync();
+
+            if (entity == null)
+                return new NotFoundResult();
+
             var questionnaireEntity = new QuestionnaireEntity(questionnaire);
+            // Updating existing tracked entity in database with new entity with same id will cause error, so clear tracker.
+            _db.ChangeTracker.Clear();
+
             var update = _db.Questionnaires.Update(questionnaireEntity);
             await update.Context.SaveChangesAsync();
 
