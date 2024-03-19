@@ -334,6 +334,9 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire))
             return new ForbiddenResult();
 
+        if (!Guid.TryParse(id, out Guid questionnaireId))
+            return new BadRequestResult();
+
         var ent = await _db.Questionnaires
             .Where(x => x.Id == questionnaireId)
             .FirstOrDefaultAsync();
