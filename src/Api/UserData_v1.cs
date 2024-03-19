@@ -1,5 +1,6 @@
 using System.Net;
 using Aire.Memory.Models;
+using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Helpers;
 using Azure.Storage.Queues;
@@ -44,18 +45,22 @@ public class UserData_v1
         Description = "User token")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deletion queued")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteUserData(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/user-data")] HttpRequest req,
         FunctionContext context,
         [FromQuery] bool? anonymize)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
         var requiredScopes = new AireScopes([
             AireScopes.DeleteChatHistory
         ]);
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
-            return new UnauthorizedResult();
+            return new ForbiddenResult();
 
         var deleteOptions = new UserDeleteOptions
         {
