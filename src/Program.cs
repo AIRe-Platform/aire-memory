@@ -14,6 +14,7 @@ using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Platform;
 using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Queues;
+using Aire.Sdk.Azure;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -31,6 +32,12 @@ var host = new HostBuilder()
         services.AddMvcCore().AddNewtonsoftJson(options => {
             options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
         });
+
+        services
+            .AddSingleton<ITableStorageService, TableStorageService>()
+            .Configure<TableStorageConfiguration>(o => {
+                o.ConnectionString = AireEnvironment.StorageConnectionString;
+            });
 
         services.AddAzureClients(builder => {
             builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
@@ -58,6 +65,7 @@ var host = new HostBuilder()
             return options;
         });
 
+        // TODO: Remove after migration to Azure Storage
         services.AddDbContext<DatabaseContext>();
 
         services

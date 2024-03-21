@@ -64,7 +64,7 @@ public class UserData_v1
 
         var deleteOptions = new UserDeleteOptions
         {
-            UserId = auth!.User,
+            UserId = auth.UserId,
             Anonymize = anonymize ?? false
         };
 

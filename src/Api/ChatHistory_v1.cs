@@ -4,25 +4,26 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Models.Chat;
 using Aire.Sdk.Auth;
+using Aire.Sdk.Azure;
+using System.Web.Http;
 
 namespace Aire.Memory.Api;
 
 public class ChatHistory_v1
 {
-    private readonly DatabaseContext _db;
+    private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public ChatHistory_v1(DatabaseContext db, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public ChatHistory_v1(ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
     {
-        _db = db;
+        _storage = storage;
         _jwt = jwt;
         _log = loggerFactory.CreateLogger<ChatHistory_v1>();
     }
@@ -30,7 +31,7 @@ public class ChatHistory_v1
     [Function("GetChatHistory_v1")]
     [OpenApiOperation(
         operationId: "getChatHistory",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Get a list of chat logs")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -52,10 +53,14 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
             return new ForbiddenResult();
 
-        var list = await _db.ChatLogs
-            .Where(x => x.UserId == auth!.User)
-            .Select(x => new ChatLogMetadata(x.Id, x.Timestamp))
-            .ToListAsync();
+        var query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
+
+        var logs = await query.ToListAsync();
+        var list = logs.Select(x => new ChatLogMetadata
+        {
+            Id = x.Id(),
+            Time = x.Timestamp
+        }).ToList();
 
         return new ObjectResult(list);
     }
@@ -63,7 +68,7 @@ public class ChatHistory_v1
     [Function("GetChatHistoryWithId_v1")]
     [OpenApiOperation(
         operationId: "getChatHistoryWithId",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Retrieve a chat log")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -74,8 +79,8 @@ public class ChatHistory_v1
     [OpenApiParameter("id", Description = "Chat log identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ChatLog), Description = "List of chat messages and chat state")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetChatHistoryWithId(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/chat-history/{id}")] HttpRequest req,
@@ -89,14 +94,12 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid chatId))
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var ent = await _db.ChatLogs
-            .Where(x => x.UserId == auth!.User && x.Id == chatId)
-            .FirstOrDefaultAsync();
+        var entity = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
+        var chat = entity?.DecryptData(auth.UserKey);
 
-        var chat = ent?.GetChatLog(auth!.UserKey);
         if (chat == null)
             return new NotFoundResult();
 
@@ -106,7 +109,7 @@ public class ChatHistory_v1
     [Function("PostChatHistory_v1")]
     [OpenApiOperation(
         operationId: "postChatHistory",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Store new chat log")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -134,24 +137,25 @@ public class ChatHistory_v1
         if (chat == null)
             return new BadRequestResult();
 
-        var entity = new ChatLogEntity
+        var entity = new ChatLogEntity(auth.UserId);
+        entity.EncryptAndSetData(auth.UserKey, chat);
+
+        var add = await _storage.UpsertAsync(entity);
+        if (!add)
+            return new InternalServerErrorResult();
+
+        var metadata = new ChatLogMetadata
         {
-            UserId = auth!.User,
-            Timestamp = DateTime.UtcNow
+            Id = entity.Id(),
+            Time = entity.Timestamp
         };
-        entity.SetChatLog(auth!.UserKey, chat);
-
-        var add = await _db.ChatLogs.AddAsync(entity);
-        await add.Context.SaveChangesAsync();
-
-        var metadata = new ChatLogMetadata(entity.Id, entity.Timestamp);
         return new ObjectResult(metadata);
     }
 
     [Function("PutChatHistory_v1")]
     [OpenApiOperation(
         operationId: "putChatHistory",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Edit existing chat log")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -178,33 +182,36 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid chatId))
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
         var chat = await req.ReadJson<ChatLog>();
         if (chat == null)
             return new BadRequestResult();
 
-        var chatlog = await _db.ChatLogs
-            .Where(x => x.Id == chatId && x.UserId == auth!.User)
-            .FirstOrDefaultAsync();
-
+        var chatlog = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
         if (chatlog == null)
             return new NotFoundResult();
 
-        chatlog.SetChatLog(auth!.UserKey, chat);
-        chatlog.Timestamp = DateTime.UtcNow;
+        chatlog.EncryptAndSetData(auth.UserKey, chat);
 
-        var update = _db.ChatLogs.Update(chatlog);
-        await update.Context.SaveChangesAsync();
+        var update = await _storage.UpsertAsync(chatlog);
+        if (!update)
+            return new InternalServerErrorResult();
 
-        return new ObjectResult(new ChatLogMetadata(chatlog.Id, chatlog.Timestamp));
+        var metadata = new ChatLogMetadata
+        {
+            Id = chatlog.Id(),
+            Time = chatlog.Timestamp
+        };
+
+        return new ObjectResult(metadata);
     }
 
     [Function("DeleteChatHistory_v1")]
     [OpenApiOperation(
         operationId: "deleteChatHistory",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Delete entire chat history")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -226,15 +233,15 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
             return new ForbiddenResult();
 
-        var history = await _db.ChatLogs
-            .Where(x => x.UserId == auth!.User)
-            .ToListAsync();
+        var query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
+        var history = await query.ToListAsync();
 
         foreach (var chat in history)
         {
-            _db.ChatLogs.Remove(chat);
+            var delete = await _storage.DeleteAsync(chat);
+            if (!delete)
+                return new InternalServerErrorResult();
         }
-        await _db.SaveChangesAsync();
 
         return new NoContentResult();
     }
@@ -242,7 +249,7 @@ public class ChatHistory_v1
     [Function("DeleteChatHistoryWithId_v1")]
     [OpenApiOperation(
         operationId: "deleteChatHistoryWithId",
-        tags: ["chat-history"],
+        tags: ["Chat History"],
         Summary = "Delete a chat log")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -255,7 +262,7 @@ public class ChatHistory_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The chat log was not found")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteChatHistoryWithId(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/chat-history/{id}")] HttpRequest req,
         FunctionContext context,
@@ -268,18 +275,16 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid chatId))
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var chat = await _db.ChatLogs
-            .Where(x => x.UserId == auth!.User && x.Id == chatId)
-            .FirstOrDefaultAsync();
-
+        var chat = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
         if (chat == null)
             return new NotFoundResult();
 
-        _db.ChatLogs.Remove(chat);
-        await _db.SaveChangesAsync();
+        var delete = await _storage.DeleteAsync(chat);
+        if (!delete)
+            return new InternalServerErrorResult();
 
         return new NoContentResult();
     }
