@@ -23,7 +23,6 @@ You should create `local.settings.json` in the root of the repository when devel
     "IsEncrypted": false,
     "Values": {
         "AzureWebJobsStorage": "",
-        "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=...",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
         "AIRE_SERVICE_BASE": "http://localhost:7071/api",
@@ -40,20 +39,6 @@ You should create `local.settings.json` in the root of the repository when devel
 ```
 
 Use the same token keys you are using in AIRe Services module.
-
-## Setting Up the Database
-
-The schema is managed in a code-first fashion. Define your entities in `src/DatabaseContext.cs` and then use the command below to generate migrations.
-
-```sh
-dotnet ef migrations add MyNewMigrationName
-```
-
-Run the following command to run migrations.
-
-```sh
-DatabaseConnectionString="..." dotnet ef database update
-```
 
 ## API Documentation
 

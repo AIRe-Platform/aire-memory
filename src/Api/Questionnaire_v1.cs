@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
@@ -13,23 +12,25 @@ using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Platform.Clients;
+using Aire.Sdk.Azure;
+using Aire.Sdk.Helpers;
 
 namespace Aire.Memory.Api;
 
 public class Questionnaire_v1
 {
-    private readonly DatabaseContext _db;
+    private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly IAireClientFactory _clientFactory;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
-        DatabaseContext db,
+        ITableStorageService storage,
         IJwtTokenService jwt,
         IAireClientFactory clientFactory,
         ILogger<Questionnaire_v1> log)
     {
-        _db = db;
+        _storage = storage;
         _jwt = jwt;
         _clientFactory = clientFactory;
         _log = log;
@@ -38,7 +39,7 @@ public class Questionnaire_v1
     [Function("GetQuestionnaires_v1")]
     [OpenApiOperation(
         operationId: "getQuestionnaires",
-        tags: ["questionnaire"],
+        tags: ["Questionnaires"],
         Summary = "Get a list of questionnaires")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -60,22 +61,16 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
-        var list = await _db.Questionnaires
-            .ToListAsync();
+        var all = await _storage.All<QuestionnaireEntity>();
+        var list = all.Select(x => x.ToModel()).ToList();
 
-        var questionnaires = new List<Questionnaire>();
-        foreach (var item in list)
-        {
-            questionnaires.Add(item.ToModel());
-        }
-
-        return new ObjectResult(questionnaires);
+        return new ObjectResult(list);
     }
 
     [Function("GetQuestionnaireWithId_v1")]
     [OpenApiOperation(
         operationId: "getQuestionnaireWithId",
-        tags: ["questionnaire"],
+        tags: ["Questionnaires"],
         Summary = "Retrieve a questionnaire")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -86,7 +81,7 @@ public class Questionnaire_v1
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Questionnaire>), Description = "List of questionnaires")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetQuestionnaireWithId(
@@ -101,25 +96,20 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid questionnaireId))
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var ent = await _db.Questionnaires
-            .Where(x => x.Id == questionnaireId)
-            .FirstOrDefaultAsync();
-
-        if (ent == null)
+        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
+        if (entity == null)
             return new NotFoundResult();
 
-        var questionnaire = ent.ToModel();
-
-        return new ObjectResult(questionnaire);
+        return new ObjectResult(entity.ToModel());
     }
 
     [Function("QueryQuestionnaire_v1")]
     [OpenApiOperation(
         operationId: "queryQuestionnaire",
-        tags: ["questionnaire"],
+        tags: ["Questionnaires"],
         Summary = "Query questionnaires"
     )]
     [OpenApiSecurity(
@@ -181,24 +171,18 @@ public class Questionnaire_v1
         if (questionnaireId == null)
             return new NotFoundResult();
 
-        var entId = Guid.Parse(questionnaireId);
-        var ent = await _db.Questionnaires
-            .Where(x => x.Id == entId)
-            .FirstOrDefaultAsync();
-
-        if (ent == null)
+        var questionnaire = await _storage.RetrieveAsync<QuestionnaireEntity>(questionnaireId);
+        if (questionnaire == null)
             return new NotFoundResult();
 
-        var questionnaire = ent.ToModel();
-
-        return new ObjectResult(questionnaire);
+        return new ObjectResult(questionnaire.ToModel());
     }
 
 
     [Function("PostQuestionnaire_v1")]
     [OpenApiOperation(
         operationId: "postQuestionnaire",
-        tags: ["questionnaire"],
+        tags: ["Questionnaires"],
         Summary = "Store new questionnaire")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -233,8 +217,8 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
         }
 
+        questionnaire.Id = Guid.NewGuid();
         var entity = new QuestionnaireEntity(questionnaire);
-        questionnaire.Id = entity.Id;
 
         {
             var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
@@ -244,11 +228,12 @@ public class Questionnaire_v1
                 _log.LogCritical("Failed to create embeddings for the questionnaire");
                 return new InternalServerErrorResult();
             }
-            entity.EmbeddingId = Guid.Parse(embedId);
+            entity.EmbeddingId = embedId;
         }
 
-        var add = await _db.Questionnaires.AddAsync(entity);
-        await add.Context.SaveChangesAsync();
+        var add = await _storage.UpsertAsync(entity);
+        if (!add)
+            return new InternalServerErrorResult();
 
         return new ObjectResult(questionnaire);
     }
@@ -257,7 +242,7 @@ public class Questionnaire_v1
     [Function("PutQuestionnaire_v1")]
     [OpenApiOperation(
             operationId: "putQuestionnaire",
-            tags: ["questionnaire"],
+            tags: ["Questionnaires"],
             Summary = "Edit existing questionnaire")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",
@@ -277,33 +262,49 @@ public class Questionnaire_v1
             string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+        if (auth == null)
             return new UnauthorizedResult();
 
-        if (!Guid.TryParse(id, out Guid questionnaireId))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+            return new ForbiddenResult();
+
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
-        var entity = await _db.Questionnaires
-            .Where(x => x.Id == questionnaireId)
-            .FirstOrDefaultAsync();
-
+        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
+        // Update entity data
+
+        if (questionnaire.Lang != null)
+            entity.Lang = questionnaire.Lang;
+
+        if (questionnaire.Keywords != null)
+            entity.Keywords = string.Join(",", questionnaire.Keywords);
+
+        if (questionnaire.Content != null)
+            entity.Content = questionnaire.Content.ObjectToJson();
+
+        if (questionnaire.Name != null)
+            entity.Name = questionnaire.Name;
+
+        // Update embedding
+
         if (entity.EmbeddingId != null)
         {
-            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId.ToString()!);
+            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");
@@ -311,24 +312,20 @@ public class Questionnaire_v1
             }
         }
 
-        var questionnaireEntity = new QuestionnaireEntity(questionnaire);
-
+        var embed = await aiService.EmbedQuestionnaire(questionnaire);
+        var embedId = embed?.Ids?.FirstOrDefault();
+        if (embedId == null)
         {
-            var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
-            var embedId = embedResult?.Ids?.FirstOrDefault();
-            if (embedId == null)
-            {
-                _log.LogCritical("Failed to create embeddings for the questionnaire");
-                return new InternalServerErrorResult();
-            }
-            questionnaireEntity.EmbeddingId = Guid.Parse(embedId);
+            _log.LogCritical("Failed to create embeddings for the questionnaire");
+            return new InternalServerErrorResult();
         }
+        entity.EmbeddingId = embedId;
 
-        // Updating existing tracked entity in database with new entity with same id will cause error, so clear tracker.
-        _db.ChangeTracker.Clear();
+        // Apply edits
 
-        var update = _db.Questionnaires.Update(questionnaireEntity);
-        await update.Context.SaveChangesAsync();
+        var save = await _storage.UpsertAsync(entity);
+        if (!save)
+            return new InternalServerErrorResult();
 
         return new ObjectResult(questionnaire);
     }
@@ -337,7 +334,7 @@ public class Questionnaire_v1
     [Function("DeleteQuestionnaire_v1")]
     [OpenApiOperation(
         operationId: "deleteQuestionnaireWithId",
-        tags: ["questionnaire"],
+        tags: ["Questionnaires"],
         Summary = "Delete a questionnaire")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -348,7 +345,7 @@ public class Questionnaire_v1
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Operation was successful")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteQuestionnaire(
@@ -363,26 +360,23 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid questionnaireId))
+        if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var ent = await _db.Questionnaires
-            .Where(x => x.Id == questionnaireId)
-            .FirstOrDefaultAsync();
-
-        if (ent == null)
+        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
+        if (entity == null)
             return new NotFoundResult();
 
-        if (ent.EmbeddingId != null)
+        if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
             if (aiService == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
-            bool result = await aiService.DeleteQuestionnaireEmbedding(ent.EmbeddingId.ToString()!);
+            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");
@@ -390,8 +384,9 @@ public class Questionnaire_v1
             }
         }
 
-        _db.Questionnaires.Remove(ent);
-        await _db.SaveChangesAsync();
+        var delete = await _storage.DeleteAsync(entity);
+        if (!delete)
+            return new InternalServerErrorResult();
 
         return new NoContentResult();
     }

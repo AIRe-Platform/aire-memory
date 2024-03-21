@@ -54,5 +54,6 @@
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.AspNetCore\Aire.Sdk.AspNetCore.csproj" />
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Models\Aire.Sdk.Models.csproj" />
     <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Platform\Aire.Sdk.Platform.csproj" />
+    <ProjectReference Include="submodules\aire-dotnet-sdk\Aire.Sdk.Azure\Aire.Sdk.Azure.csproj" />
   </ItemGroup>
 </Project>
