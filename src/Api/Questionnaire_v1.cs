@@ -287,6 +287,13 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new BadRequestResult();
 
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
         var entity = await _db.Questionnaires
             .Where(x => x.Id == questionnaireId)
             .FirstOrDefaultAsync();
@@ -294,7 +301,29 @@ public class Questionnaire_v1
         if (entity == null)
             return new NotFoundResult();
 
+        if (entity.EmbeddingId != null)
+        {
+            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId.ToString()!);
+            if (!result)
+            {
+                _log.LogCritical("Failed to delete questionnaire embeddings");
+                return new InternalServerErrorResult();
+            }
+        }
+
         var questionnaireEntity = new QuestionnaireEntity(questionnaire);
+
+        {
+            var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
+            var embedId = embedResult?.Ids?.FirstOrDefault();
+            if (embedId == null)
+            {
+                _log.LogCritical("Failed to create embeddings for the questionnaire");
+                return new InternalServerErrorResult();
+            }
+            questionnaireEntity.EmbeddingId = Guid.Parse(embedId);
+        }
+
         // Updating existing tracked entity in database with new entity with same id will cause error, so clear tracker.
         _db.ChangeTracker.Clear();
 
