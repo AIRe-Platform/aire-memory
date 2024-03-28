@@ -52,7 +52,7 @@ var host = new HostBuilder()
                 Info = new OpenApiInfo {
                     Version = "0.1.0",
                     Title = "AIRe Memory Module",
-                    Description = "This is the reference implementation of AIRe Platform Memory module."
+                    Description = "This is the reference implementation of the AIRe Platform Memory module."
                 },
                 Servers = [
                     new OpenApiServer { Url = AireEnvironment.OpenApiHost ?? "/api" }
