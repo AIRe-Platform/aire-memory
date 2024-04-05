@@ -45,6 +45,9 @@ var host = new HostBuilder()
                     options.MessageEncoding = QueueMessageEncoding.Base64;
                 })
                 .WithName("queue-client");
+
+            builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString)
+                .WithName("blob-client");
         });
 
         services.AddSingleton<IOpenApiConfigurationOptions>(_ => {
