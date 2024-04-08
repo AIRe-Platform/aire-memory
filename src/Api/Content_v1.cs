@@ -14,25 +14,40 @@ using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
-
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Microsoft.Extensions.Azure;
 namespace Aire.Memory.Api;
+
 
 public class Content_v1
 {
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
-    private readonly IAireClientFactory _clientFactory;
     private readonly ILogger _log;
+    private readonly BlobServiceClient _blobServiceClient;
+
+    private readonly BlobContainerClient _media;
 
     public Content_v1(
+        IAzureClientFactory<BlobServiceClient> clientFactory,
+        IAzureClientFactory<BlobServiceClient> blobServiceClient,
+        
         ITableStorageService storage,
         IJwtTokenService jwt,
-        IAireClientFactory clientFactory,
         ILogger<Content_v1> log)
     {
+
+        _media = clientFactory
+        .CreateClient("blob-client")
+        .GetBlobContainerClient("media");
+
+        _media.CreateIfNotExists();
+
         _storage = storage;
         _jwt = jwt;
-        _clientFactory = clientFactory;
         _log = log;
     }
 
@@ -103,6 +118,21 @@ public class Content_v1
         content.Id = Guid.NewGuid();
         var entity = new ContentEntity(content);
 
+
+        Console.WriteLine("context?", context);
+
+        /* var stringTobase64 = Base64Decode(context.url);
+        
+        byte[] data = Convert.FromBase64String(encodedString);
+        string decodedString = System.Text.Encoding.UTF8.GetString(data);
+
+        _media.add(stringTobase64); */
+
+
+
+        Console.WriteLine("media?", _media);
+
+
         var add = await _storage.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
@@ -110,6 +140,11 @@ public class Content_v1
         return new ObjectResult(content);
     }
 
+/* public static string Base64Decode(string base64EncodedData)
+{
+    var base64EncodedBytes = Convert.FromBase64String(base64EncodedData);
+    return Encoding.UTF8.GetString(base64EncodedBytes);
+} */
 
     [Function("PutContent_v1")]
     [OpenApiOperation(

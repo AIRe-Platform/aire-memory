@@ -48,15 +48,12 @@ You can set a custom host with `OpenApi__HostNames` environment value.
 
 ## Deployment
 
-Run migrations on the database as instructed above.
-
 Publish the Fuctions app and then setup the following required environment values:
 
 - `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
 - `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.
 - `TOKEN_ENCRYPTION_KEY` The token encryption key shared between the platform instance modules.
-- `DatabaseConnectionString` The connection string for a PostgreSql database.
 - `StorageConnectionString` Azure Table Storage connection string
 
 ## Disclaimer
