@@ -31,7 +31,7 @@ public class QuestionnaireResultsEntity : BaseTableEntity
         return PartitionKey ?? "";
     }
 
-    public async Task<QuestionnaireResults?> GetResults(BlobContainerClient client, string userKey)
+    public async Task<QuestionnaireResults?> GetFromBlob(BlobContainerClient client, string userKey)
     {
         var blob = client.GetBlobClient(Id());
         if (!blob.Exists())
@@ -44,16 +44,17 @@ public class QuestionnaireResultsEntity : BaseTableEntity
         return EncryptionHelper.DecryptObject<QuestionnaireResults>(data, userKey);
     }
 
-    public async Task SaveResults(BlobContainerClient client, QuestionnaireResults results, string userKey)
+    public async Task SaveToBlob(BlobContainerClient client, QuestionnaireResults results, string userKey)
     {
-        var data = EncryptionHelper.EncryptObject(results, userKey);
+        var encrypted = EncryptionHelper.EncryptObject(results, userKey);
+        var data = BinaryData.FromString(encrypted);
         var blob = client.GetBlobClient(Id());
         await blob.UploadAsync(data, overwrite: true);
     }
 
     public async Task<QuestionnaireResults> ToModelAsync(BlobContainerClient client, string userKey)
     {
-        var content = await GetResults(client, userKey);
+        var content = await GetFromBlob(client, userKey);
         return new QuestionnaireResults
         {
             Id = RowKey,

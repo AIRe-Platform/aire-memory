@@ -246,7 +246,7 @@ public class Questionnaire_v1
         if(questionnaire.Content == null)
             return new BadRequestResult();
 
-        await entity.SaveContentBlob(_blobs, questionnaire.Content);
+        await entity.SaveToBlob(_blobs, questionnaire.Content);
 
         var add = await _storage.UpsertAsync(entity);
         if (!add)
@@ -312,7 +312,7 @@ public class Questionnaire_v1
             entity.Keywords = string.Join(",", questionnaire.Keywords);
 
         if (questionnaire.Content != null)
-            await entity.SaveContentBlob(_blobs, questionnaire.Content);
+            await entity.SaveToBlob(_blobs, questionnaire.Content);
 
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;

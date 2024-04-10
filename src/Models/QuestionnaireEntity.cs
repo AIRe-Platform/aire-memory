@@ -45,7 +45,7 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-            Content = await GetContentBlob(client)
+            Content = await GetFromBlob(client)
         };
 
         if (Guid.TryParse(RowKey, out var id))
@@ -54,7 +54,7 @@ public class QuestionnaireEntity : BaseTableEntity
         return model;
     }
 
-    public async Task<List<QuestionnaireContent>?> GetContentBlob(BlobContainerClient client)
+    public async Task<List<QuestionnaireContent>?> GetFromBlob(BlobContainerClient client)
     {
         var blob = client.GetBlobClient(Id());
         if (!blob.Exists())
@@ -67,7 +67,7 @@ public class QuestionnaireEntity : BaseTableEntity
         return data.JsonToObject<List<QuestionnaireContent>?>();
     }
 
-    public async Task SaveContentBlob(BlobContainerClient client, List<QuestionnaireContent> content)
+    public async Task SaveToBlob(BlobContainerClient client, List<QuestionnaireContent> content)
     {
         var data = BinaryData.FromString(content.ObjectToJson());
         var blob = client.GetBlobClient(Id());

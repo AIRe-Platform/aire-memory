@@ -54,7 +54,8 @@ public class ChatLogEntity : BaseTableEntity
 
     public async Task SaveToBlob(BlobContainerClient client, ChatLog chat, string userKey)
     {
-        var data = EncryptionHelper.EncryptObject(chat, userKey);
+        var encrypted = EncryptionHelper.EncryptObject(chat, userKey);
+        var data = BinaryData.FromString(encrypted);
         var blob = client.GetBlobClient(Id());
         await blob.UploadAsync(data, overwrite: true);
     }

@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
@@ -121,7 +120,7 @@ public class QuestionnaireResults_v1
             QuestionnaireId = results.QuestionnaireId,
             Timestamp = results.Timestamp
         };
-        await entity.SaveResults(_blobs, results, auth.UserKey);
+        await entity.SaveToBlob(_blobs, results, auth.UserKey);
 
         var add = await _storage.UpsertAsync(entity);
         if (!add)
