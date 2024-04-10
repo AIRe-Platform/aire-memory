@@ -68,9 +68,6 @@ var host = new HostBuilder()
             return options;
         });
 
-        // TODO: Remove after migration to Azure Storage
-        services.AddDbContext<DatabaseContext>();
-
         services
             .Configure<AirePlatformServiceConfiguration>(o => {
                 o.ServiceUrl = AireEnvironment.PlatformServiceUrl;
