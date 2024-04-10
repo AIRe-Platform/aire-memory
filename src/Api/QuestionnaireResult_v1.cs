@@ -120,7 +120,7 @@ public class QuestionnaireResults_v1
             QuestionnaireId = results.QuestionnaireId,
             Timestamp = results.Timestamp
         };
-        await entity.SaveResults(_blobs, results, auth.UserKey);
+        await entity.SaveToBlob(_blobs, results, auth.UserKey);
 
         var add = await _storage.UpsertAsync(entity);
         if (!add)

@@ -20,7 +20,7 @@ public static class EncryptionHelper
         return json?.JsonToObject<T>();
     }
 
-    public static string EncryptObject<T>(T obj , string key) where T : class, new()
+    public static string EncryptObject<T>(T obj, string key) where T : class, new()
     {
         var json = obj.ObjectToJson();
         var keyBytes = Convert.FromBase64String(key);
