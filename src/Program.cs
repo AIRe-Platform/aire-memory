@@ -14,6 +14,7 @@ using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Platform;
 using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Queues;
+using Aire.Sdk.Azure;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker => {
@@ -32,12 +33,21 @@ var host = new HostBuilder()
             options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
         });
 
+        services
+            .AddSingleton<ITableStorageService, TableStorageService>()
+            .Configure<TableStorageConfiguration>(o => {
+                o.ConnectionString = AireEnvironment.StorageConnectionString;
+            });
+
         services.AddAzureClients(builder => {
             builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
                 .ConfigureOptions(options => {
                     options.MessageEncoding = QueueMessageEncoding.Base64;
                 })
                 .WithName("queue-client");
+
+            builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString)
+                .WithName("blob-client");
         });
 
         services.AddSingleton<IOpenApiConfigurationOptions>(_ => {
@@ -45,7 +55,7 @@ var host = new HostBuilder()
                 Info = new OpenApiInfo {
                     Version = "0.1.0",
                     Title = "AIRe Memory Module",
-                    Description = "This is the reference implementation of AIRe Platform Memory module."
+                    Description = "This is the reference implementation of the AIRe Platform Memory module."
                 },
                 Servers = [
                     new OpenApiServer { Url = AireEnvironment.OpenApiHost ?? "/api" }
@@ -58,6 +68,7 @@ var host = new HostBuilder()
             return options;
         });
 
+        // TODO: Remove after migration to Azure Storage
         services.AddDbContext<DatabaseContext>();
 
         services
