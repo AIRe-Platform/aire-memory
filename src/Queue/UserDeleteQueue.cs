@@ -1,67 +1,49 @@
 using Aire.Memory.Models;
-using Aire.Sdk.Azure;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace Aire.Memory.Queue;
-
-public class UserDeleteQueue
+namespace Aire.Memory.Queue
 {
-    private readonly ITableStorageService _storage;
-    private readonly ILogger<UserDeleteQueue> _log;
-
-    public UserDeleteQueue(ITableStorageService storage, ILogger<UserDeleteQueue> log)
+    public class UserDeleteQueue
     {
-        _storage = storage;
-        _log = log;
-    }
+        private readonly DatabaseContext _db;
+        private readonly ILogger<UserDeleteQueue> _log;
 
-    [Function(nameof(UserDeleteQueue))]
-    public async Task Run([QueueTrigger(AireConstant.UserDeleteQueue, Connection = "StorageConnectionString")] UserDeleteOptions options)
-    {
-        _log.LogInformation($"Begin deleting data of user '{options.UserId}'");
-
-        // TODO: Implement data anonymization (decrypt data, save to some place)
-        if (options.Anonymize)
+        public UserDeleteQueue(DatabaseContext db, ILogger<UserDeleteQueue> log)
         {
-            _log.LogWarning("User data anonymization is not yet implemented");
-            _log.LogWarning("The data will be deleted");
+            _db = db;
+            _log = log;
         }
 
-        // Clear chat logs
+        [Function(nameof(UserDeleteQueue))]
+        public async Task Run([QueueTrigger(AireConstant.UserDeleteQueue, Connection = "StorageConnectionString")] UserDeleteOptions options)
         {
+            _log.LogInformation($"Begin deleting data of user '{options.UserId}'");
+            
+            // TODO: Implement data anonymization (decrypt data, save to some place)
+            if(options.Anonymize)
+            {
+                _log.LogWarning("User data anonymization is not yet implemented");
+                _log.LogWarning("The data will be deleted");
+            }
+
             _log.LogInformation("Searching for chat logs...");
-            var chatlogs_query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == options.UserId);
-            var chatlogs = await chatlogs_query.ToListAsync();
-            foreach (var chat in chatlogs)
-            {
-                _log.LogInformation($"Deleting chat log '{chat.RowKey}'...");
-                var delete = await _storage.DeleteAsync(chat);
-                if (!delete)
-                {
-                    _log.LogCritical("Failed to delete chat log {id}", chat.RowKey);
-                    throw new Exception("Failed to delete data");
-                }
-            }
-        }
 
-        // Clear questionnaire results
-        {
-            _log.LogInformation("Searching for questionnaire results...");
-            var results_query = await _storage.QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == options.UserId);
-            var results = await results_query.ToListAsync();
-            foreach(var result in results)
-            {
-                _log.LogInformation($"Deleting questionnaire result '{result.RowKey}'...");
-                var delete = await _storage.DeleteAsync(result);
-                if (!delete)
-                {
-                    _log.LogCritical("Failed to delete questionnaire results {id}", result.RowKey);
-                    throw new Exception("Failed to delete data");
-                }
-            }
-        }
+            var history = await _db.ChatLogs
+                .Where(x => x.UserId == options.UserId)
+                .ToListAsync();
 
-        _log.LogInformation("Tasks completed.");
+            foreach (var chat in history)
+            {
+                _log.LogInformation($"Found chat log: '{chat.Id}'");
+                _db.ChatLogs.Remove(chat);
+            }
+
+            _log.LogInformation("The data is now being deleted...");
+            await _db.SaveChangesAsync();
+
+            _log.LogInformation("Tasks completed.");
+        }
     }
 }

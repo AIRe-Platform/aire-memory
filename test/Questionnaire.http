@@ -35,15 +35,6 @@ Authorization: Bearer {{token}}
 
 < ./questionnaire_example.json
 
-### Edit questionnaire
-
-PUT {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1
-Accept: application/json
-Content-Type: application/json
-Authorization: Bearer {{token}}
-
-< ./questionnaire_example.json
-
 
 ### Delete a questionnaire
 DELETE {{base_url}}/v1/questionnaire/{{questionnaire_id}} HTTP/1.1

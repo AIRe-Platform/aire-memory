@@ -11,151 +11,106 @@ using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
-using Aire.Sdk.Azure;
-using System.Web.Http;
 
-namespace Aire.Memory.Api;
-
-public class QuestionnaireResults_v1
+namespace Aire.Memory.Api
 {
-    private readonly ITableStorageService _storage;
-    private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
-
-    public QuestionnaireResults_v1(ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public class QuestionnaireResults_v1
     {
-        _storage = storage;
-        _jwt = jwt;
-        _log = loggerFactory.CreateLogger<QuestionnaireResults_v1>();
-    }
+        private readonly DatabaseContext _db;
+        private readonly IJwtTokenService _jwt;
+        private readonly ILogger _log;
 
-    [Function("GetQuestionnaireResults_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnaireResults",
-        tags: ["Questionnaire Results"],
-        Summary = "Retrieve questionnaire results")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
-        Scheme = OpenApiSecuritySchemeType.Bearer,
-        BearerFormat = "JWT",
-        Description = "User token")]
-    [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
-    public async Task<IActionResult> GetQuestionnaireResults(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
-        FunctionContext context,
-        string id)
-    {
-        var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
-            return new UnauthorizedResult();
-
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
-            return new ForbiddenResult();
-
-        if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
-
-        var query = await _storage
-            .QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == auth.UserId && x.QuestionnaireId == id);
-
-        var results = await query.ToListAsync();
-        var list = results.Select(x => x.ToModel(auth.UserKey)).ToList();
-
-        return new OkObjectResult(list);
-    }
-
-    [Function("PostQuestionnaireResults_v1")]
-    [OpenApiOperation(
-        operationId: "postQuestionnaireResults",
-        tags: ["Questionnaire Results"],
-        Summary = "Store new questionnaire results")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
-        Scheme = OpenApiSecuritySchemeType.Bearer,
-        BearerFormat = "JWT",
-        Description = "User token")]
-    [OpenApiRequestBody("application/json", typeof(QuestionnaireResults), Description = "A questionnaire results", Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(QuestionnaireResults), Description = "Saved questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    public async Task<IActionResult> PostQuestionnaireResults(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire-results")] HttpRequest req,
-        FunctionContext context)
-    {
-        var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
-            return new UnauthorizedResult();
-
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
-            return new ForbiddenResult();
-
-        var results = await req.ReadJson<QuestionnaireResults>();
-        if (results == null)
-            return new BadRequestResult();
-
-        results.Id = Guid.NewGuid().ToString();
-        results.Timestamp = DateTime.UtcNow;
-        var entity = new QuestionnaireResultsEntity(auth.UserId, results.Id)
+        public QuestionnaireResults_v1(DatabaseContext db, IJwtTokenService jwt, ILoggerFactory loggerFactory)
         {
-            QuestionnaireId = results.QuestionnaireId,
-            Timestamp = results.Timestamp
-        };
-        entity.EncryptAndSetData(auth.UserKey, results);
+            _db = db;
+            _jwt = jwt;
+            _log = loggerFactory.CreateLogger<QuestionnaireResults_v1>();
+        }
 
-        var add = await _storage.UpsertAsync(entity);
-        if (!add)
-            return new InternalServerErrorResult();
+        [Function("GetQuestionnaireResults_v1")]
+        [OpenApiOperation(
+                    operationId: "getQuestionnaireResults",
+                    tags: ["questionnaire", "results"],
+                    Summary = "Retrieve a questionnaire results")]
+        [OpenApiSecurity(
+                    schemeName: "bearer_auth",
+                    schemeType: SecuritySchemeType.Http,
+                    Scheme = OpenApiSecuritySchemeType.Bearer,
+                    BearerFormat = "JWT",
+                    Description = "User token")]
+        [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(QuestionnaireResults), Description = "Questionnaire results")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire or results was not found.")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+        public async Task<IActionResult> GetQuestionnaireResults(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
+            FunctionContext context,
+            string id)
+        {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
+                return new UnauthorizedResult();
 
-        return new OkObjectResult(results);
-    }
+            if (!Guid.TryParse(id, out Guid questionnaireId))
+                return new BadRequestResult();
 
-    [Function("DeleteQuestionnaireResults_v1")]
-    [OpenApiOperation(
-        operationId: "deleteQuestionnaireResults",
-        tags: ["Questionnaire Results"],
-        Summary = "Retrieve questionnaire results")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
-        Scheme = OpenApiSecuritySchemeType.Bearer,
-        BearerFormat = "JWT",
-        Description = "User token")]
-    [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Results not found")]
-    public async Task<IActionResult> DeleteQuestionnaireResults(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
-        FunctionContext context,
-        string id)
-    {
-        var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
-            return new UnauthorizedResult();
+            var ent = await _db.QuestionnaireResults
+                .Where(x => x.UserId == auth!.User)
+                .Where(x => x.QuestionnaireId == questionnaireId)
+                .FirstOrDefaultAsync();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
-            return new ForbiddenResult();
+            if (ent == null)
+                return new NotFoundResult();
 
-        if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
+            var questionnaireResults = ent.ToModel(auth!.UserKey);
 
-        var entity = await _storage.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
-        if (entity == null)
-            return new NotFoundResult();
+            return new OkObjectResult(questionnaireResults);
+        }
 
-        var delete = await _storage.DeleteAsync(entity);
-        if (!delete)
-            return new InternalServerErrorResult();
+        [Function("PostQuestionnaireResults_v1")]
+        [OpenApiOperation(
+            operationId: "postQuestionnaireResults",
+            tags: ["questionnaire", "results"],
+            Summary = "Store new questionnaire results")]
+        [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+        [OpenApiRequestBody("application/json", typeof(QuestionnaireResults), Description = "A questionnaire results", Required = true)]
+        [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(QuestionnaireResults), Description = "Saved questionnaire results")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+        [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+        public async Task<IActionResult> PostQuestionnaireResults(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire-results")] HttpRequest req,
+            FunctionContext context)
+        {
+            var auth = context.Features.Get<JwtAuthFeature>();
+            if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
+                return new UnauthorizedResult();
 
-        return new NoContentResult();
+            var questionnaireResults = await req.ReadJson<QuestionnaireResults>();
+            if (questionnaireResults == null)
+                return new BadRequestResult();
+
+            if (!Guid.TryParse(questionnaireResults.QuestionnaireId, out Guid questionnaireId))
+                return new BadRequestResult();
+
+            var entity = new QuestionnaireResultsEntity
+            {
+                UserId = auth!.User,
+                Timestamp = DateTime.UtcNow,
+                QuestionnaireId = questionnaireId
+            };
+            entity.SetQuestionnaireResults(auth!.UserKey, questionnaireResults);
+
+            var add = await _db.QuestionnaireResults.AddAsync(entity);
+            await add.Context.SaveChangesAsync();
+
+            questionnaireResults.Id = entity.Id.ToString();
+            return new OkObjectResult(questionnaireResults);
+        }
     }
 }

@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Aire.Memory.Models.SQL;
+using Aire.Memory.Models;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace Aire.Memory
 {
-    [Obsolete("Will be removed after migration to Azure Storage")]
     public class DatabaseContext : DbContext
     {
         public DatabaseContext(DbContextOptions<DatabaseContext> options)
