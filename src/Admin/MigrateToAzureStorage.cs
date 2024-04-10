@@ -2,21 +2,38 @@ using System.Web.Http;
 using Aire.Memory;
 using Aire.Memory.Models;
 using Aire.Sdk.Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Logging;
 
 // TODO: Remove after migration
 public class MigrateToAzureStorage
 {
+    private readonly BlobContainerClient _chatlogs;
+    private readonly BlobContainerClient _questionnaires;
+    private readonly BlobContainerClient _questionnaireResults;
+
     private readonly ILogger<MigrateToAzureStorage> _log;
     private readonly DatabaseContext _db;
     private readonly ITableStorageService _storage;
 
-    public MigrateToAzureStorage(ILogger<MigrateToAzureStorage> log, DatabaseContext db, ITableStorageService storage)
+    public MigrateToAzureStorage(
+        ILogger<MigrateToAzureStorage> log,
+        IAzureClientFactory<BlobServiceClient> clientFactory,
+        DatabaseContext db,
+        ITableStorageService storage)
     {
+        var client = clientFactory.CreateClient("blob-client");
+
+        _chatlogs = client.GetBlobContainerClient("chatlogs");
+        _questionnaires = client.GetBlobContainerClient("questionnaires");
+        _questionnaireResults = client.GetBlobContainerClient("questionnaire-results");
+
         _log = log;
         _db = db;
         _storage = storage;
@@ -31,6 +48,7 @@ public class MigrateToAzureStorage
             // Migrate chat histories
             {
                 _log.LogWarning("Starting to migrate chatlogs now!");
+                await _chatlogs.CreateIfNotExistsAsync(publicAccessType: PublicAccessType.None);
 
                 foreach (var l in _db.ChatLogs)
                 {
@@ -38,8 +56,11 @@ public class MigrateToAzureStorage
                     {
                         PartitionKey = l.UserId.ToString(),
                         RowKey = l.Id.ToString(),
-                        EncryptedChatLog = l.EncryptedChatLog
                     };
+
+                    var blobData = BinaryData.FromString(l.EncryptedChatLog!);
+                    var client = _chatlogs.GetBlobClient(l.Id.ToString());
+                    await client.UploadAsync(blobData, overwrite: true);
 
                     var response = await _storage.UpsertAsync(ent);
                     if (!response)
@@ -52,6 +73,7 @@ public class MigrateToAzureStorage
             // Migrate questionnaires
             {
                 _log.LogWarning("Starting to migrate questionnaires now!");
+                await _questionnaires.CreateIfNotExistsAsync(publicAccessType: PublicAccessType.None);
 
                 foreach (var q in _db.Questionnaires)
                 {
@@ -59,12 +81,15 @@ public class MigrateToAzureStorage
                     {
                         PartitionKey = q.Id.ToString(),
                         RowKey = q.Id.ToString(),
-                        Content = q.Content,
                         EmbeddingId = q.EmbeddingId.ToString(),
                         Keywords = string.Join(",", q.Keywords!),
                         Lang = q.Lang,
                         Name = q.Name
                     };
+
+                    var blobData = BinaryData.FromString(q.Content!);
+                    var client = _questionnaires.GetBlobClient(q.Id.ToString());
+                    await client.UploadAsync(blobData, overwrite: true);
 
                     var response = await _storage.UpsertAsync(ent);
                     if (!response)
@@ -77,6 +102,7 @@ public class MigrateToAzureStorage
             // Migrate questionnaire results
             {
                 _log.LogWarning("Starting to migrate questionnaire results now!");
+                await _questionnaireResults.CreateIfNotExistsAsync(publicAccessType: PublicAccessType.None);
 
                 foreach (var r in _db.QuestionnaireResults)
                 {
@@ -84,9 +110,12 @@ public class MigrateToAzureStorage
                     {
                         PartitionKey = r.UserId.ToString(),
                         RowKey = r.Id.ToString(),
-                        EncryptedQuestionnaireResults = r.EncryptedQuestionnaireResults,
                         QuestionnaireId = r.QuestionnaireId.ToString(),
                     };
+
+                    var blobData = BinaryData.FromString(r.EncryptedQuestionnaireResults!);
+                    var client = _questionnaireResults.GetBlobClient(r.Id.ToString());
+                    await client.UploadAsync(blobData, overwrite: true);
 
                     var response = await _storage.UpsertAsync(ent);
                     if (!response)

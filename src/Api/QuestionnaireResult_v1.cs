@@ -13,17 +13,28 @@ using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Azure;
 using System.Web.Http;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Azure;
+using Azure.Storage.Blobs.Models;
 
 namespace Aire.Memory.Api;
 
 public class QuestionnaireResults_v1
 {
+    private readonly BlobContainerClient _blobs;
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public QuestionnaireResults_v1(ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public QuestionnaireResults_v1(
+        IAzureClientFactory<BlobServiceClient> blobClientFactory,
+        ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
     {
+        _blobs = blobClientFactory
+            .CreateClient("blob-client")
+            .GetBlobContainerClient("questionnaire-results");
+        _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
         _storage = storage;
         _jwt = jwt;
         _log = loggerFactory.CreateLogger<QuestionnaireResults_v1>();
@@ -64,7 +75,10 @@ public class QuestionnaireResults_v1
             .QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == auth.UserId && x.QuestionnaireId == id);
 
         var results = await query.ToListAsync();
-        var list = results.Select(x => x.ToModel(auth.UserKey)).ToList();
+        var asyncList = results.ToAsyncEnumerable();
+        var list = await asyncList
+            .SelectAwait(async x => await x.ToModelAsync(_blobs, auth.UserKey))
+            .ToListAsync();
 
         return new OkObjectResult(list);
     }
@@ -107,7 +121,7 @@ public class QuestionnaireResults_v1
             QuestionnaireId = results.QuestionnaireId,
             Timestamp = results.Timestamp
         };
-        entity.EncryptAndSetData(auth.UserKey, results);
+        await entity.SaveResults(_blobs, results, auth.UserKey);
 
         var add = await _storage.UpsertAsync(entity);
         if (!add)
@@ -151,6 +165,8 @@ public class QuestionnaireResults_v1
         var entity = await _storage.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
         if (entity == null)
             return new NotFoundResult();
+
+        await _blobs.DeleteBlobIfExistsAsync(entity.Id());
 
         var delete = await _storage.DeleteAsync(entity);
         if (!delete)
