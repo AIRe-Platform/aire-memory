@@ -23,7 +23,6 @@ You should create `local.settings.json` in the root of the repository when devel
     "IsEncrypted": false,
     "Values": {
         "AzureWebJobsStorage": "",
-        "DatabaseConnectionString": "Host=localhost;Database=aire-memory;Username=...;Password=...",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
         "AIRE_SERVICE_BASE": "http://localhost:7071/api",
@@ -41,20 +40,6 @@ You should create `local.settings.json` in the root of the repository when devel
 
 Use the same token keys you are using in AIRe Services module.
 
-## Setting Up the Database
-
-The schema is managed in a code-first fashion. Define your entities in `src/DatabaseContext.cs` and then use the command below to generate migrations.
-
-```sh
-dotnet ef migrations add MyNewMigrationName
-```
-
-Run the following command to run migrations.
-
-```sh
-DatabaseConnectionString="..." dotnet ef database update
-```
-
 ## API Documentation
 
 Visit path `/api/swagger/ui` to inspect. The default host is set to `/api` path.
@@ -63,15 +48,12 @@ You can set a custom host with `OpenApi__HostNames` environment value.
 
 ## Deployment
 
-Run migrations on the database as instructed above.
-
 Publish the Fuctions app and then setup the following required environment values:
 
 - `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
 - `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.
 - `TOKEN_ENCRYPTION_KEY` The token encryption key shared between the platform instance modules.
-- `DatabaseConnectionString` The connection string for a PostgreSql database.
 - `StorageConnectionString` Azure Table Storage connection string
 
 ## Disclaimer
