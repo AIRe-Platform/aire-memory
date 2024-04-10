@@ -13,23 +13,32 @@ using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Azure;
-using Aire.Sdk.Helpers;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Azure;
+using Azure.Storage.Blobs.Models;
 
 namespace Aire.Memory.Api;
 
 public class Questionnaire_v1
 {
+    private readonly BlobContainerClient _blobs;
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly IAireClientFactory _clientFactory;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
+        IAzureClientFactory<BlobServiceClient> blobClientFactory,
         ITableStorageService storage,
         IJwtTokenService jwt,
         IAireClientFactory clientFactory,
         ILogger<Questionnaire_v1> log)
     {
+        _blobs = blobClientFactory
+            .CreateClient("blob-client")
+            .GetBlobContainerClient("questionnaires");
+        _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+        
         _storage = storage;
         _jwt = jwt;
         _clientFactory = clientFactory;
@@ -62,7 +71,8 @@ public class Questionnaire_v1
             return new ForbiddenResult();
 
         var all = await _storage.All<QuestionnaireEntity>();
-        var list = all.Select(x => x.ToModel()).ToList();
+        var models = all.Select(x => x.ToModelAsync(_blobs)).ToAsyncEnumerable();
+        var list = await models.SelectAwait(async x => await x).ToListAsync();
 
         return new ObjectResult(list);
     }
@@ -103,7 +113,8 @@ public class Questionnaire_v1
         if (entity == null)
             return new NotFoundResult();
 
-        return new ObjectResult(entity.ToModel());
+        var model = await entity.ToModelAsync(_blobs);
+        return new ObjectResult(model);
     }
 
     [Function("QueryQuestionnaire_v1")]
@@ -175,7 +186,8 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new NotFoundResult();
 
-        return new ObjectResult(questionnaire.ToModel());
+        var model = await questionnaire.ToModelAsync(_blobs);
+        return new ObjectResult(model);
     }
 
 
@@ -230,6 +242,11 @@ public class Questionnaire_v1
             }
             entity.EmbeddingId = embedId;
         }
+
+        if(questionnaire.Content == null)
+            return new BadRequestResult();
+
+        await entity.SaveContentBlob(_blobs, questionnaire.Content);
 
         var add = await _storage.UpsertAsync(entity);
         if (!add)
@@ -295,7 +312,7 @@ public class Questionnaire_v1
             entity.Keywords = string.Join(",", questionnaire.Keywords);
 
         if (questionnaire.Content != null)
-            entity.Content = questionnaire.Content.ObjectToJson();
+            await entity.SaveContentBlob(_blobs, questionnaire.Content);
 
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
@@ -383,6 +400,8 @@ public class Questionnaire_v1
                 return new InternalServerErrorResult();
             }
         }
+
+        await _blobs.DeleteBlobIfExistsAsync(entity.Id());
 
         var delete = await _storage.DeleteAsync(entity);
         if (!delete)

@@ -1,7 +1,7 @@
-using System.Security.Cryptography;
-using Aire.Sdk.Helpers;
 using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Azure;
+using Azure.Storage.Blobs;
+using Aire.Memory.Helpers;
 
 namespace Aire.Memory.Models;
 
@@ -13,7 +13,6 @@ namespace Aire.Memory.Models;
 public class QuestionnaireResultsEntity : BaseTableEntity
 {
     public string? QuestionnaireId { get; set; }
-    public string? EncryptedQuestionnaireResults { get; set; }
 
     public QuestionnaireResultsEntity() { }
     public QuestionnaireResultsEntity(string userId, string? resultId = null)
@@ -32,31 +31,29 @@ public class QuestionnaireResultsEntity : BaseTableEntity
         return PartitionKey ?? "";
     }
 
-    public QuestionnaireResults? DecryptData(string userKey)
+    public async Task<QuestionnaireResults?> GetResults(BlobContainerClient client, string userKey)
     {
-        var key = Convert.FromBase64String(userKey);
-        var parts = EncryptedQuestionnaireResults?.Split(".");
-
-        if (parts == null || parts.Length != 2)
+        var blob = client.GetBlobClient(Id());
+        if (!blob.Exists())
             return null;
 
-        var cipherText = parts[0];
-        var iv = Convert.FromBase64String(parts[1]);
-        var json = cipherText.DecryptString(key, iv);
-        return json?.JsonToObject<QuestionnaireResults>();
+        var stream = await blob.OpenReadAsync();
+        var reader = new StreamReader(stream);
+        string data = reader.ReadToEnd();
+
+        return EncryptionHelper.DecryptObject<QuestionnaireResults>(data, userKey);
     }
 
-    public void EncryptAndSetData(string userKey, QuestionnaireResults questionnaireResults)
+    public async Task SaveResults(BlobContainerClient client, QuestionnaireResults results, string userKey)
     {
-        var json = questionnaireResults.ObjectToJson();
-        var key = Convert.FromBase64String(userKey);
-        var iv = RandomNumberGenerator.GetBytes(16);
-        EncryptedQuestionnaireResults = $"{json.EncryptString(key, iv)}.{Convert.ToBase64String(iv)}";
+        var data = EncryptionHelper.EncryptObject(results, userKey);
+        var blob = client.GetBlobClient(Id());
+        await blob.UploadAsync(data, overwrite: true);
     }
 
-    public QuestionnaireResults ToModel(string userKey)
+    public async Task<QuestionnaireResults> ToModelAsync(BlobContainerClient client, string userKey)
     {
-        var content = DecryptData(userKey);
+        var content = await GetResults(client, userKey);
         return new QuestionnaireResults
         {
             Id = RowKey,
