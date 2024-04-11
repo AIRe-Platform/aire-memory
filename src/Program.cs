@@ -40,6 +40,10 @@ var host = new HostBuilder()
             });
 
         services.AddAzureClients(builder => {
+            builder.ConfigureDefaults(conf => {
+                conf.Diagnostics.IsLoggingEnabled = false;
+            });
+
             builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
                 .ConfigureOptions(options => {
                     options.MessageEncoding = QueueMessageEncoding.Base64;
