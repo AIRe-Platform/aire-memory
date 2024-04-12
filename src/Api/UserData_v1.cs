@@ -22,7 +22,7 @@ public class UserData_v1
 
     public UserData_v1(QueueServiceClient queues, IJwtTokenService jwt, ILogger<UserData_v1> log)
     {
-        _queue = queues.GetQueueClient(AireConstant.UserDeleteQueue);
+        _queue = queues.GetQueueClient(AireConstants.Queues.UserDelete);
         _queue.CreateIfNotExists();
 
         _jwt = jwt;

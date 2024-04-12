@@ -26,7 +26,7 @@ public class ChatHistory_v1
 
     public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILogger<ChatHistory_v1> log)
     {
-        _chatlogs = blobs.GetBlobContainerClient("chatlogs");
+        _chatlogs = blobs.GetBlobContainerClient(AireConstants.Blobs.ChatLogs);
         _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = tables;

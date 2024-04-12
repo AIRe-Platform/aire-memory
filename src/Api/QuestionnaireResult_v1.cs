@@ -26,7 +26,7 @@ public class QuestionnaireResults_v1
 
     public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt, ILogger<QuestionnaireResults_v1> log)
     {
-        _blobs = blobs.GetBlobContainerClient("questionnaire-results");
+        _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.QuestionnaireResults);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = storage;

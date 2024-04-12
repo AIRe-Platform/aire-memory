@@ -17,7 +17,7 @@ public class UserDeleteQueue
     }
 
     [Function(nameof(UserDeleteQueue))]
-    public async Task Run([QueueTrigger(AireConstant.UserDeleteQueue, Connection = "StorageConnectionString")] UserDeleteOptions options)
+    public async Task Run([QueueTrigger(AireConstants.Queues.UserDelete, Connection = "StorageConnectionString")] UserDeleteOptions options)
     {
         _log.LogInformation($"Begin deleting data of user '{options.UserId}'");
 

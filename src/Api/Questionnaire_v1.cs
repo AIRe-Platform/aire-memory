@@ -33,7 +33,7 @@ public class Questionnaire_v1
         IAireClientFactory clientFactory,
         ILogger<Questionnaire_v1> log)
     {
-        _questionnaires = blobs.GetBlobContainerClient("questionnaires");
+        _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
         _questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
         
         _tables = tables;
