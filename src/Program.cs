@@ -33,24 +33,25 @@ var host = new HostBuilder()
             options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
         });
 
-        services
-            .AddSingleton<ITableStorageService, TableStorageService>()
-            .Configure<TableStorageConfiguration>(o => {
-                o.ConnectionString = AireEnvironment.StorageConnectionString;
-            });
-
         services.AddAzureClients(builder => {
-            builder.ConfigureDefaults(conf => {
-                conf.Diagnostics.IsLoggingEnabled = false;
-            });
+            builder.AddTableServiceClient(AireEnvironment.StorageConnectionString)
+                .ConfigureOptions(options => {
+                    options.Diagnostics.IsLoggingEnabled = false;
+                });
 
             builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
                 .ConfigureOptions(options => {
                     options.MessageEncoding = QueueMessageEncoding.Base64;
+                    options.Diagnostics.IsLoggingEnabled = false;
                 });
 
-            builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString);
+            builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString)
+                .ConfigureOptions(options => {
+                    options.Diagnostics.IsLoggingEnabled = false;
+                });
         });
+
+        services.AddSingleton<ITableStorageService, TableStorageService>();
 
         services.AddSingleton<IOpenApiConfigurationOptions>(_ => {
             var options = new OpenApiConfigurationOptions {
