@@ -24,14 +24,14 @@ public class ChatHistory_v1
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILogger<ChatHistory_v1> log)
     {
         _chatlogs = blobs.GetBlobContainerClient("chatlogs");
         _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = tables;
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<ChatHistory_v1>();
+        _log = log;
     }
 
     [Function("GetChatHistory_v1")]

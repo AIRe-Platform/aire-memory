@@ -20,13 +20,13 @@ public class UserData_v1
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public UserData_v1(QueueServiceClient queues, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public UserData_v1(QueueServiceClient queues, IJwtTokenService jwt, ILogger<UserData_v1> log)
     {
         _queue = queues.GetQueueClient(AireConstant.UserDeleteQueue);
         _queue.CreateIfNotExists();
 
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<ChatHistory_v1>();
+        _log = log;
     }
 
     [Function("DeleteUserData_v1")]

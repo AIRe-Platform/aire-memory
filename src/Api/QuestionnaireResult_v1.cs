@@ -24,14 +24,14 @@ public class QuestionnaireResults_v1
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt, ILogger<QuestionnaireResults_v1> log)
     {
         _blobs = blobs.GetBlobContainerClient("questionnaire-results");
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = storage;
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<QuestionnaireResults_v1>();
+        _log = log;
     }
 
     [Function("GetQuestionnaireResults_v1")]
