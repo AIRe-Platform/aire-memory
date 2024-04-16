@@ -16,11 +16,11 @@ public class ContentEntity : BaseTableEntity
     public bool? Hidden { get; set; }
     public string? Type { get; set; }
     public string? Url { get; set; }
+    public string? BlobName { get; set; }
     public int? ViewsCount { get; set; }
     public int? ViewersRating { get; set; }
     public string? InjuredType { get; set; }
-    public string? Age { get; set; }
-    public string? Gender { get; set; }
+    public string? Keywords { get; set; }
 
     public ContentEntity() 
     { 
@@ -37,12 +37,11 @@ public class ContentEntity : BaseTableEntity
         Description = content.Description;
         Hidden = content.Hidden;
         Type = content.Type;
-        Url = content.Url; 
+        Url = content.Url;
         ViewsCount = content.ViewsCount;
         ViewersRating = content.ViewersRating;
         InjuredType = content.InjuredType;
-        Age = content.Age;
-        Gender = content.Gender;
+        Keywords = string.Join(",", content.Keywords!);
     }
 
     public Content ToModel()
@@ -54,12 +53,13 @@ public class ContentEntity : BaseTableEntity
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Hidden = Hidden,
             Type = Type,
-            Url = Url, 
+            Url = Url,
+            //BlobName = BlobName,
             ViewsCount = ViewsCount,
             ViewersRating = ViewersRating,
             InjuredType = InjuredType,
-            Age = Age,
-            Gender = Gender
+            Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+
         };
 
         if (Guid.TryParse(RowKey, out var id))
