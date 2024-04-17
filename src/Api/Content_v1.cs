@@ -78,7 +78,7 @@ public class Content_v1
         
         foreach (var contentEntity in all){
 
-            if(contentEntity.BlobName != null){
+            if(!String.IsNullOrEmpty(contentEntity.BlobName)){
                 var blobSasBuilder = new BlobSasBuilder()
                 {
                     BlobContainerName =  "content-media",//_container.BlobContainerName,
@@ -213,6 +213,12 @@ public class Content_v1
         var content = json.ToString().JsonToObject<Content>();
         string URI = "";
 
+        if(entity.BlobName != "" && String.IsNullOrEmpty(content.BlobName)){
+            await _container.DeleteBlobAsync(entity.BlobName);
+            entity.Url = "";
+            entity.BlobName = "";
+        }
+
         if(req.Form.Files.Count > 0 )
         {
             //remove the old media file, dosent matter if it is the same
@@ -231,8 +237,7 @@ public class Content_v1
                 entity.BlobName = blobName;
             }
         }
-        
-
+      
         // Update entity data
         if (content.Name != null)
             entity.Name = content.Name;
@@ -248,11 +253,8 @@ public class Content_v1
 
         if (content.Url != null)
             entity.Url = content.Url;
-        else{
+        else
             entity.Url = "";
-            content.Url = "";
-        }
-            
 
         if (content.ViewsCount != null)
             entity.ViewsCount = content.ViewsCount;
@@ -365,19 +367,3 @@ public class Content_v1
         return new NoContentResult();
     }
 }
-
-
- /*
-        if(file != null){
-            //if there is file, we have to update the file
-            if(entity.BlobName != null){
-                await _container.DeleteBlobAsync(entity.BlobName);
-            }
-        }
-        else //check if file is the same, if not remove old file
-        {
-            if(entity.BlobName != content.Url){
-                await _container.DeleteBlobAsync(entity.BlobName);
-            }
-        }
-        */

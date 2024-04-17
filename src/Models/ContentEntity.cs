@@ -10,7 +10,6 @@ namespace Aire.Memory.Models;
 [EntityTable("Contents")]
 public class ContentEntity : BaseTableEntity
 {
-    public Guid? Id { get; set; } = Guid.NewGuid();
     public string? Name { get; set; }
     public string? Description { get; set; }
     public bool? Hidden { get; set; }
@@ -28,6 +27,10 @@ public class ContentEntity : BaseTableEntity
         PartitionKey ??= id;
         RowKey ??= id;
     }
+    public string Id()
+    {
+        return RowKey ?? "";
+    }
 
     public ContentEntity(Content content) 
     { 
@@ -42,6 +45,7 @@ public class ContentEntity : BaseTableEntity
         ViewersRating = content.ViewersRating;
         InjuredType = content.InjuredType;
         Keywords = string.Join(",", content.Keywords!);
+        BlobName = content.BlobName; 
     }
 
     public Content ToModel()
@@ -54,12 +58,11 @@ public class ContentEntity : BaseTableEntity
             Hidden = Hidden,
             Type = Type,
             Url = Url,
-            //BlobName = BlobName,
+            BlobName = BlobName,
             ViewsCount = ViewsCount,
             ViewersRating = ViewersRating,
             InjuredType = InjuredType,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-
         };
 
         if (Guid.TryParse(RowKey, out var id))
