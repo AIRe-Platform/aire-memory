@@ -1,6 +1,16 @@
 namespace Aire.Memory;
 
-public static class AireConstant
+public static class AireConstants
 {
-    public const string UserDeleteQueue = "user-delete-queue";
+    public static class Queues
+    {
+        public const string UserDelete = "user-delete-queue";
+    }
+
+    public static class Blobs
+    {
+        public const string ChatLogs = "chatlogs";
+        public const string Questionnaires = "questionnaires";
+        public const string QuestionnaireResults = "questionnaire-results";
+    }
 }

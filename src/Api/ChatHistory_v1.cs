@@ -12,20 +12,26 @@ using Aire.Sdk.Models.Chat;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Azure;
 using System.Web.Http;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 namespace Aire.Memory.Api;
 
 public class ChatHistory_v1
 {
-    private readonly ITableStorageService _storage;
+    private readonly BlobContainerClient _chatlogs;
+    private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public ChatHistory_v1(ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILogger<ChatHistory_v1> log)
     {
-        _storage = storage;
+        _chatlogs = blobs.GetBlobContainerClient(AireConstants.Blobs.ChatLogs);
+        _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
+        _tables = tables;
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<ChatHistory_v1>();
+        _log = log;
     }
 
     [Function("GetChatHistory_v1")]
@@ -53,7 +59,7 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
             return new ForbiddenResult();
 
-        var query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
+        var query = await _tables.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
 
         var logs = await query.ToListAsync();
         var list = logs.Select(x => new ChatLogMetadata
@@ -97,9 +103,11 @@ public class ChatHistory_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
-        var chat = entity?.DecryptData(auth.UserKey);
+        var entity = await _tables.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
+        if (entity == null)
+            return new NotFoundResult();
 
+        var chat = await entity.GetFromBlob(_chatlogs, auth.UserKey);
         if (chat == null)
             return new NotFoundResult();
 
@@ -138,9 +146,9 @@ public class ChatHistory_v1
             return new BadRequestResult();
 
         var entity = new ChatLogEntity(auth.UserId);
-        entity.EncryptAndSetData(auth.UserKey, chat);
+        await entity.SaveToBlob(_chatlogs, chat, auth.UserKey);
 
-        var add = await _storage.UpsertAsync(entity);
+        var add = await _tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
 
@@ -189,13 +197,13 @@ public class ChatHistory_v1
         if (chat == null)
             return new BadRequestResult();
 
-        var chatlog = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
+        var chatlog = await _tables.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
         if (chatlog == null)
             return new NotFoundResult();
 
-        chatlog.EncryptAndSetData(auth.UserKey, chat);
+        await chatlog.SaveToBlob(_chatlogs, chat, auth.UserKey);
 
-        var update = await _storage.UpsertAsync(chatlog);
+        var update = await _tables.UpsertAsync(chatlog);
         if (!update)
             return new InternalServerErrorResult();
 
@@ -233,12 +241,14 @@ public class ChatHistory_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
             return new ForbiddenResult();
 
-        var query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
+        var query = await _tables.QueryAsync<ChatLogEntity>(x => x.PartitionKey == auth.UserId);
         var history = await query.ToListAsync();
 
         foreach (var chat in history)
         {
-            var delete = await _storage.DeleteAsync(chat);
+            await _chatlogs.DeleteBlobIfExistsAsync(chat.Id());
+
+            var delete = await _tables.DeleteAsync(chat);
             if (!delete)
                 return new InternalServerErrorResult();
         }
@@ -278,11 +288,13 @@ public class ChatHistory_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var chat = await _storage.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
+        var chat = await _tables.RetrieveAsync<ChatLogEntity>(auth.UserId, id);
         if (chat == null)
             return new NotFoundResult();
 
-        var delete = await _storage.DeleteAsync(chat);
+        await _chatlogs.DeleteBlobIfExistsAsync(chat.Id());
+
+        var delete = await _tables.DeleteAsync(chat);
         if (!delete)
             return new InternalServerErrorResult();
 

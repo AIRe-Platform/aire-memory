@@ -17,42 +17,56 @@ using Azure.Storage.Queues;
 using Aire.Sdk.Azure;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWebApplication(worker => {
+    .ConfigureFunctionsWebApplication(worker =>
+    {
         worker.UseNewtonsoftJson();
-        worker.UseJwtAuth(new JwtTokenServiceConfiguration() {
+        worker.UseJwtAuth(new JwtTokenServiceConfiguration()
+        {
             SigningKey = AireEnvironment.TokenSigningKey,
             EncryptionKey = AireEnvironment.TokenEncryptionKey
         });
     })
-    .ConfigureServices(services => {
+    .ConfigureServices(services =>
+    {
         services.AddHttpClient();
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
-        services.AddMvcCore().AddNewtonsoftJson(options => {
+        services.AddMvcCore().AddNewtonsoftJson(options =>
+        {
             options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
         });
 
-        services
-            .AddSingleton<ITableStorageService, TableStorageService>()
-            .Configure<TableStorageConfiguration>(o => {
-                o.ConnectionString = AireEnvironment.StorageConnectionString;
-            });
+        services.AddAzureClients(builder =>
+        {
+            builder.AddTableServiceClient(AireEnvironment.StorageConnectionString)
+                .ConfigureOptions(options =>
+                {
+                    options.Diagnostics.IsLoggingEnabled = false;
+                });
 
-        services.AddAzureClients(builder => {
             builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
-                .ConfigureOptions(options => {
+                .ConfigureOptions(options =>
+                {
                     options.MessageEncoding = QueueMessageEncoding.Base64;
-                })
-                .WithName("queue-client");
+                    options.Diagnostics.IsLoggingEnabled = false;
+                });
 
             builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString)
-                .WithName("blob-client");
+                .ConfigureOptions(options =>
+                {
+                    options.Diagnostics.IsLoggingEnabled = false;
+                });
         });
 
-        services.AddSingleton<IOpenApiConfigurationOptions>(_ => {
-            var options = new OpenApiConfigurationOptions {
-                Info = new OpenApiInfo {
+        services.AddSingleton<ITableStorageService, TableStorageService>();
+
+        services.AddSingleton<IOpenApiConfigurationOptions>(_ =>
+        {
+            var options = new OpenApiConfigurationOptions
+            {
+                Info = new OpenApiInfo
+                {
                     Version = "0.1.0",
                     Title = "AIRe Memory Module",
                     Description = "This is the reference implementation of the AIRe Platform Memory module."
@@ -68,11 +82,9 @@ var host = new HostBuilder()
             return options;
         });
 
-        // TODO: Remove after migration to Azure Storage
-        services.AddDbContext<DatabaseContext>();
-
         services
-            .Configure<AirePlatformServiceConfiguration>(o => {
+            .Configure<AirePlatformServiceConfiguration>(o =>
+            {
                 o.ServiceUrl = AireEnvironment.PlatformServiceUrl;
                 o.ServiceKey = AireEnvironment.PlatformServiceKey;
             })

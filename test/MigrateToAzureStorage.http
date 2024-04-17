@@ -1,3 +1,0 @@
-# Make sure you have StorageConnectionString defined in your local.settings.json
-
-GET http://localhost:7073/api/migration/database HTTP/1.1

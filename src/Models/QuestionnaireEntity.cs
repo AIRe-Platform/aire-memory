@@ -1,6 +1,7 @@
 using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
 using Aire.Sdk.Models.Resources;
+using Azure.Storage.Blobs;
 
 namespace Aire.Memory.Models;
 
@@ -13,7 +14,6 @@ public class QuestionnaireEntity : BaseTableEntity
     public string? Name { get; set; }
     public string? Lang { get; set; }
     public string? Keywords { get; set; }
-    public string? Content { get; set; }
     public string? EmbeddingId { get; set; }
 
     public QuestionnaireEntity()
@@ -35,10 +35,9 @@ public class QuestionnaireEntity : BaseTableEntity
         Name = questionnaire.Name;
         Lang = questionnaire.Lang;
         Keywords = string.Join(",", questionnaire.Keywords!);
-        Content = questionnaire.Content?.ObjectToJson();
     }
 
-    public Questionnaire ToModel()
+    public async Task<Questionnaire> ToModelAsync(BlobContainerClient client)
     {
         var model = new Questionnaire
         {
@@ -46,12 +45,32 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-            Content = Content?.JsonToObject<List<QuestionnaireContent>>()
+            Content = await GetFromBlob(client)
         };
 
         if (Guid.TryParse(RowKey, out var id))
             model.Id = id;
 
         return model;
+    }
+
+    public async Task<List<QuestionnaireContent>?> GetFromBlob(BlobContainerClient client)
+    {
+        var blob = client.GetBlobClient(Id());
+        if (!blob.Exists())
+            return null;
+
+        var stream = await blob.OpenReadAsync();
+        var reader = new StreamReader(stream);
+        string data = reader.ReadToEnd();
+
+        return data.JsonToObject<List<QuestionnaireContent>?>();
+    }
+
+    public async Task SaveToBlob(BlobContainerClient client, List<QuestionnaireContent> content)
+    {
+        var data = BinaryData.FromString(content.ObjectToJson());
+        var blob = client.GetBlobClient(Id());
+        await blob.UploadAsync(data, overwrite: true);
     }
 }

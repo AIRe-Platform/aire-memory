@@ -1,7 +1,7 @@
-using System.Security.Cryptography;
+using Aire.Memory.Helpers;
 using Aire.Sdk.Azure;
-using Aire.Sdk.Helpers;
 using Aire.Sdk.Models.Chat;
+using Azure.Storage.Blobs;
 
 namespace Aire.Memory.Models;
 
@@ -12,8 +12,6 @@ namespace Aire.Memory.Models;
 [EntityTable("Chatlogs")]
 public class ChatLogEntity : BaseTableEntity
 {
-    public string? EncryptedChatLog { get; set; }
-
     public ChatLogEntity() { }
     public ChatLogEntity(string userId, string? chatId = null)
     {
@@ -31,38 +29,34 @@ public class ChatLogEntity : BaseTableEntity
         return PartitionKey ?? "";
     }
 
-    public ChatLog? DecryptData(string userKey)
+    public async Task<ChatLog?> GetFromBlob(BlobContainerClient client, string userKey)
     {
-        var key = Convert.FromBase64String(userKey);
-        var parts = EncryptedChatLog?.Split(".");
-
-        if (parts == null || parts.Length != 2)
+        var blob = client.GetBlobClient(Id());
+        if (!blob.Exists())
             return null;
 
-        var cipherText = parts[0];
-        var iv = Convert.FromBase64String(parts[1]);
-        var json = cipherText.DecryptString(key, iv);
+        var stream = await blob.OpenReadAsync();
+        var reader = new StreamReader(stream);
+        string data = reader.ReadToEnd();
 
-        var chat = json?.JsonToObject<ChatLog>();
-
-        // Backwards-compatibility with message lists
+        var chat = EncryptionHelper.DecryptObject<ChatLog>(data, userKey);
         if (chat == null)
         {
-            var messages = json?.JsonToObject<List<ChatMessage>>();
+            // Backwards-compatibility with message lists
+            var messages = EncryptionHelper.DecryptObject<List<ChatMessage>>(data, userKey);
             if (messages != null)
             {
                 chat = new ChatLog { Messages = messages };
             }
         }
-
         return chat;
     }
 
-    public void EncryptAndSetData(string userKey, ChatLog chat)
+    public async Task SaveToBlob(BlobContainerClient client, ChatLog chat, string userKey)
     {
-        var json = chat.ObjectToJson();
-        var key = Convert.FromBase64String(userKey);
-        var iv = RandomNumberGenerator.GetBytes(16);
-        EncryptedChatLog = $"{json.EncryptString(key, iv)}.{Convert.ToBase64String(iv)}";
+        var encrypted = EncryptionHelper.EncryptObject(chat, userKey);
+        var data = BinaryData.FromString(encrypted);
+        var blob = client.GetBlobClient(Id());
+        await blob.UploadAsync(data, overwrite: true);
     }
 }
