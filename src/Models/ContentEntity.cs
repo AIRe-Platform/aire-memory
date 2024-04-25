@@ -19,8 +19,6 @@ public class ContentEntity : BaseTableEntity
     public int? ViewsCount { get; set; }
     public int? ViewersRating { get; set; }
     public string? InjuredType { get; set; }
-    public string? Age { get; set; }
-    public string? Gender { get; set; }
 
     public ContentEntity() 
     { 
@@ -41,8 +39,6 @@ public class ContentEntity : BaseTableEntity
         ViewsCount = content.ViewsCount;
         ViewersRating = content.ViewersRating;
         InjuredType = content.InjuredType;
-        Age = content.Age;
-        Gender = content.Gender;
     }
 
     public Content ToModel()
@@ -57,9 +53,7 @@ public class ContentEntity : BaseTableEntity
             Url = Url, 
             ViewsCount = ViewsCount,
             ViewersRating = ViewersRating,
-            InjuredType = InjuredType,
-            Age = Age,
-            Gender = Gender
+            InjuredType = InjuredType
         };
 
         if (Guid.TryParse(RowKey, out var id))

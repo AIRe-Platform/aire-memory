@@ -208,12 +208,6 @@ public class Content_v1
         if (content.InjuredType != null)
             entity.InjuredType = content.InjuredType;
 
-        if (content.Age != null)
-            entity.Age = content.Age;
-
-        if (content.Gender != null)
-            entity.Gender = content.Gender;
-
         // Apply edits
 
         var save = await _storage.UpsertAsync(entity);
