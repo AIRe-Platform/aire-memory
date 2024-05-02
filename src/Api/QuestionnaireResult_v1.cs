@@ -13,7 +13,6 @@ using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Azure;
 using System.Web.Http;
 using Azure.Storage.Blobs;
-using Microsoft.Extensions.Azure;
 using Azure.Storage.Blobs.Models;
 
 namespace Aire.Memory.Api;
@@ -21,22 +20,18 @@ namespace Aire.Memory.Api;
 public class QuestionnaireResults_v1
 {
     private readonly BlobContainerClient _blobs;
-    private readonly ITableStorageService _storage;
+    private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public QuestionnaireResults_v1(
-        IAzureClientFactory<BlobServiceClient> blobClientFactory,
-        ITableStorageService storage, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt, ILogger<QuestionnaireResults_v1> log)
     {
-        _blobs = blobClientFactory
-            .CreateClient("blob-client")
-            .GetBlobContainerClient("questionnaire-results");
+        _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.QuestionnaireResults);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
-        _storage = storage;
+        _tables = storage;
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<QuestionnaireResults_v1>();
+        _log = log;
     }
 
     [Function("GetQuestionnaireResults_v1")]
@@ -70,7 +65,7 @@ public class QuestionnaireResults_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var query = await _storage
+        var query = await _tables
             .QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == auth.UserId && x.QuestionnaireId == id);
 
         var results = await query.ToListAsync();
@@ -122,7 +117,7 @@ public class QuestionnaireResults_v1
         };
         await entity.SaveToBlob(_blobs, results, auth.UserKey);
 
-        var add = await _storage.UpsertAsync(entity);
+        var add = await _tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
 
@@ -161,13 +156,13 @@ public class QuestionnaireResults_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
+        var entity = await _tables.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
         if (entity == null)
             return new NotFoundResult();
 
         await _blobs.DeleteBlobIfExistsAsync(entity.Id());
 
-        var delete = await _storage.DeleteAsync(entity);
+        var delete = await _tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
 

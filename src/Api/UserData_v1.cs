@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 
@@ -21,15 +20,13 @@ public class UserData_v1
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
 
-    public UserData_v1(IAzureClientFactory<QueueServiceClient> clientFactory, IJwtTokenService jwt, ILoggerFactory loggerFactory)
+    public UserData_v1(QueueServiceClient queues, IJwtTokenService jwt, ILogger<UserData_v1> log)
     {
-        _queue = clientFactory
-            .CreateClient("queue-client")
-            .GetQueueClient(AireConstant.UserDeleteQueue);
+        _queue = queues.GetQueueClient(AireConstants.Queues.UserDelete);
         _queue.CreateIfNotExists();
 
         _jwt = jwt;
-        _log = loggerFactory.CreateLogger<ChatHistory_v1>();
+        _log = log;
     }
 
     [Function("DeleteUserData_v1")]

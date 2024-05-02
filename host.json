@@ -10,6 +10,7 @@
         },
         "logLevel": {
             "default": "Information",
+            "Function": "Warning",
             "Azure.Core": "Warning"
         }
     },

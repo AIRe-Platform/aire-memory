@@ -14,32 +14,29 @@ using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Azure;
 using Azure.Storage.Blobs;
-using Microsoft.Extensions.Azure;
 using Azure.Storage.Blobs.Models;
 
 namespace Aire.Memory.Api;
 
 public class Questionnaire_v1
 {
-    private readonly BlobContainerClient _blobs;
-    private readonly ITableStorageService _storage;
+    private readonly BlobContainerClient _questionnaires;
+    private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
     private readonly IAireClientFactory _clientFactory;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
-        IAzureClientFactory<BlobServiceClient> blobClientFactory,
-        ITableStorageService storage,
+        BlobServiceClient blobs,
+        ITableStorageService tables,
         IJwtTokenService jwt,
         IAireClientFactory clientFactory,
         ILogger<Questionnaire_v1> log)
     {
-        _blobs = blobClientFactory
-            .CreateClient("blob-client")
-            .GetBlobContainerClient("questionnaires");
-        _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+        _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
+        _questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
         
-        _storage = storage;
+        _tables = tables;
         _jwt = jwt;
         _clientFactory = clientFactory;
         _log = log;
@@ -70,8 +67,8 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
-        var all = await _storage.All<QuestionnaireEntity>();
-        var models = all.Select(x => x.ToModelAsync(_blobs)).ToAsyncEnumerable();
+        var all = await _tables.All<QuestionnaireEntity>();
+        var models = all.Select(x => x.ToModelAsync(_questionnaires)).ToAsyncEnumerable();
         var list = await models.SelectAwait(async x => await x).ToListAsync();
 
         return new ObjectResult(list);
@@ -109,11 +106,11 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
+        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
-        var model = await entity.ToModelAsync(_blobs);
+        var model = await entity.ToModelAsync(_questionnaires);
         return new ObjectResult(model);
     }
 
@@ -182,11 +179,11 @@ public class Questionnaire_v1
         if (questionnaireId == null)
             return new NotFoundResult();
 
-        var questionnaire = await _storage.RetrieveAsync<QuestionnaireEntity>(questionnaireId);
+        var questionnaire = await _tables.RetrieveAsync<QuestionnaireEntity>(questionnaireId);
         if (questionnaire == null)
             return new NotFoundResult();
 
-        var model = await questionnaire.ToModelAsync(_blobs);
+        var model = await questionnaire.ToModelAsync(_questionnaires);
         return new ObjectResult(model);
     }
 
@@ -246,9 +243,9 @@ public class Questionnaire_v1
         if(questionnaire.Content == null)
             return new BadRequestResult();
 
-        await entity.SaveToBlob(_blobs, questionnaire.Content);
+        await entity.SaveToBlob(_questionnaires, questionnaire.Content);
 
-        var add = await _storage.UpsertAsync(entity);
+        var add = await _tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
 
@@ -299,7 +296,7 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
         }
 
-        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
+        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -312,7 +309,7 @@ public class Questionnaire_v1
             entity.Keywords = string.Join(",", questionnaire.Keywords);
 
         if (questionnaire.Content != null)
-            await entity.SaveToBlob(_blobs, questionnaire.Content);
+            await entity.SaveToBlob(_questionnaires, questionnaire.Content);
 
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
@@ -340,7 +337,7 @@ public class Questionnaire_v1
 
         // Apply edits
 
-        var save = await _storage.UpsertAsync(entity);
+        var save = await _tables.UpsertAsync(entity);
         if (!save)
             return new InternalServerErrorResult();
 
@@ -380,7 +377,7 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<QuestionnaireEntity>(id);
+        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -401,9 +398,9 @@ public class Questionnaire_v1
             }
         }
 
-        await _blobs.DeleteBlobIfExistsAsync(entity.Id());
+        await _questionnaires.DeleteBlobIfExistsAsync(entity.Id());
 
-        var delete = await _storage.DeleteAsync(entity);
+        var delete = await _tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
 
