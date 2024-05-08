@@ -32,16 +32,13 @@ public class Content_v1
 
 
     public Content_v1(
-        IAzureClientFactory<BlobServiceClient> clientFactory,
+        BlobServiceClient blobs,
         ITableStorageService storage,
         IJwtTokenService jwt,
         ILogger<Content_v1> log)
     {
-        _container = clientFactory
-            .CreateClient("blob-client")
-            .GetBlobContainerClient("content-media");
-       
-        _container.CreateIfNotExists();
+        _container = blobs.GetBlobContainerClient(AireConstants.Blobs.Contents);
+        _container.CreateIfNotExists(publicAccessType: PublicAccessType.None);
        
         _storage = storage;
         _jwt = jwt;
@@ -81,7 +78,7 @@ public class Content_v1
             if(!String.IsNullOrEmpty(contentEntity.BlobName)){
                 var blobSasBuilder = new BlobSasBuilder()
                 {
-                    BlobContainerName =  "content-media",//_container.BlobContainerName,
+                    BlobContainerName =  AireConstants.Blobs.Contents,//_container.BlobContainerName,
                     ExpiresOn = DateTime.UtcNow.AddMinutes(15),
                 };
                 BlobClient blobClient = _container.GetBlobClient(contentEntity.BlobName);
@@ -130,34 +127,33 @@ public class Content_v1
         if (formData == null)
             return new BadRequestResult();
         
+        formData.TryGetValue("json", out var json);
+        var content = json.ToString().JsonToObject<Content>();
         var blobName = Guid.NewGuid().ToString();
         // Get a reference to a blob with unique id
         BlobClient blobClient = _container.GetBlobClient(blobName);
 
-        Console.WriteLine("Uploading to Blob storage as blob:\n\t {0}\n", blobClient.Uri);
+        if(content != null  && content.Type != "url"){
+            Console.WriteLine("Uploading to Blob storage as blob:\n\t {0}\n", blobClient.Uri);
+            string URI = "";
+            if(req.Form.Files.Count > 0 ){
+                var file = req.Form.Files[0];
 
-        string URI = "";
-
-        if(req.Form.Files.Count > 0 ){
-            var file = req.Form.Files[0];
-
-            using (var stream = file.OpenReadStream())
-            {
-                await blobClient.UploadAsync(stream, true);
-                URI = blobClient.Uri.AbsoluteUri;
+                using (var stream = file.OpenReadStream())
+                {
+                    await blobClient.UploadAsync(stream, true);
+                    URI = blobClient.Uri.AbsoluteUri;
+                }
             }
+            content.Url = URI;
         }
         
-        formData.TryGetValue("json", out var json);
-
-        var content = json.ToString().JsonToObject<Content>();
- 
-        content.Url = URI;
         if (content != null)
         { 
             content.Id = Guid.NewGuid();
             var entity = new ContentEntity(content);
-            entity.BlobName = blobClient.Name;
+            if(content.Type != "url")
+                entity.BlobName = blobClient.Name;
             var add = await _storage.UpsertAsync(entity);
             if (!add)
                 return new InternalServerErrorResult(); 
@@ -211,9 +207,9 @@ public class Content_v1
         string blobName = "";
         formData.TryGetValue("json", out var json);      
         var content = json.ToString().JsonToObject<Content>();
-        string URI = "";
 
-        if(entity.BlobName != "" && String.IsNullOrEmpty(content.BlobName)){
+        if(entity.BlobName != "" && !String.IsNullOrEmpty(content.BlobName)){
+            //remove the old media file, dosent matter if it is the same
             await _container.DeleteBlobAsync(entity.BlobName);
             entity.Url = "";
             entity.BlobName = "";
@@ -221,21 +217,19 @@ public class Content_v1
 
         if(req.Form.Files.Count > 0 )
         {
-            //remove the old media file, dosent matter if it is the same
-            if(entity.BlobName != null)
-                _container.DeleteBlobAsync(entity.BlobName);
-
             var file = req.Form.Files[0];
 
-            using (var stream = file.OpenReadStream())
-            {
-                blobName = Guid.NewGuid().ToString();
-                // Get a reference to a blob with unique id
-                BlobClient blobClient = _container.GetBlobClient(blobName);
-                await blobClient.UploadAsync(stream, true);
-                entity.Url = blobClient.Uri.AbsoluteUri;
-                entity.BlobName = blobName;
-            }
+            if(content != null && content.Type != "url"){
+                using (var stream = file.OpenReadStream())
+                {
+                    blobName = Guid.NewGuid().ToString();
+                    // Get a reference to a blob with unique id
+                    BlobClient blobClient = _container.GetBlobClient(blobName);
+                    await blobClient.UploadAsync(stream, true);
+                    entity.Url = blobClient.Uri.AbsoluteUri;
+                    entity.BlobName = blobName;
+                }
+            }  
         }
       
         // Update entity data

@@ -12,5 +12,6 @@ public static class AireConstants
         public const string ChatLogs = "chatlogs";
         public const string Questionnaires = "questionnaires";
         public const string QuestionnaireResults = "questionnaire-results";
+        public const string Contents = "contents";
     }
 }
