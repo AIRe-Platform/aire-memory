@@ -362,7 +362,7 @@ public class Content_v1
             return new NotFoundResult();
     
         if(entity.BlobName != null)
-            _container.DeleteBlobAsync(entity.BlobName);
+            await _container.DeleteBlobAsync(entity.BlobName);
 
         return new NoContentResult();
     }
