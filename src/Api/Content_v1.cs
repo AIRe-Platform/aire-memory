@@ -11,25 +11,20 @@ using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
-using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
-using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Sas;
-using Microsoft.Extensions.Azure;
-namespace Aire.Memory.Api;
 
+namespace Aire.Memory.Api;
 
 public class Content_v1
 {
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly ILogger _log;
-    private readonly BlobContainerClient _container;
-
+    private readonly BlobContainerClient _blobs;
 
     public Content_v1(
         BlobServiceClient blobs,
@@ -37,20 +32,23 @@ public class Content_v1
         IJwtTokenService jwt,
         ILogger<Content_v1> log)
     {
-        _container = blobs.GetBlobContainerClient(AireConstants.Blobs.Contents);
-        _container.CreateIfNotExists(publicAccessType: PublicAccessType.None);
-       
+        _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Contents);
+        _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
         _storage = storage;
         _jwt = jwt;
         _log = log;
-       
+
     }
+
+    // TODO: Implement API to search for content
+    // TODO: Implement API to retrieve content by ID
 
     [Function("GetContents_v1")]
     [OpenApiOperation(
         operationId: "getContents",
         tags: ["content"],
-        Summary = "Get a list of contents")]
+        Summary = "Get a list of content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
         schemeType: SecuritySchemeType.Http,
@@ -69,27 +67,31 @@ public class Content_v1
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
-             return new ForbiddenResult();
-        
-        var all = await _storage.All<ContentEntity>();
-        
-        foreach (var contentEntity in all){
+            return new ForbiddenResult();
 
-            if(!String.IsNullOrEmpty(contentEntity.BlobName)){
+        var all = await _storage.All<ContentEntity>();
+        var list = all.Select(x =>
+        {
+            var model = x.ToModel();
+
+            if (model.Type != ContentType.URL)
+            {
                 var blobSasBuilder = new BlobSasBuilder()
                 {
-                    BlobContainerName =  AireConstants.Blobs.Contents,//_container.BlobContainerName,
+                    BlobContainerName = AireConstants.Blobs.Contents,
                     ExpiresOn = DateTime.UtcNow.AddMinutes(15),
                 };
-                BlobClient blobClient = _container.GetBlobClient(contentEntity.BlobName);
-                blobSasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Write);
-                
+
+                BlobClient blobClient = _blobs.GetBlobClient(x.Id());
+                blobSasBuilder.SetPermissions(BlobSasPermissions.Read);
+
                 var sasUri = blobClient.GenerateSasUri(blobSasBuilder);
-                contentEntity.Url = sasUri.ToString();
+                model.Url = sasUri.AbsoluteUri;
             }
-        }
-        var list = all.Select(x => x.ToModel()).ToList();
-        
+
+            return model;
+        });
+
         return new ObjectResult(list);
     }
 
@@ -114,56 +116,52 @@ public class Content_v1
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content")] HttpRequest req,
         FunctionContext context)
     {
-        
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
             return new UnauthorizedResult();
-        
+
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent))
             return new ForbiddenResult();
 
         var formData = await req.ReadFormAsync();
-
         if (formData == null)
             return new BadRequestResult();
-        
+
         formData.TryGetValue("json", out var json);
+
         var content = json.ToString().JsonToObject<Content>();
-        var blobName = Guid.NewGuid().ToString();
-        // Get a reference to a blob with unique id
-        BlobClient blobClient = _container.GetBlobClient(blobName);
+        if (content == null || content.Id.HasValue || !content.Type.HasValue)
+            return new BadRequestResult();
 
-        if(content != null  && content.Type != "url"){
-            Console.WriteLine("Uploading to Blob storage as blob:\n\t {0}\n", blobClient.Uri);
-            string URI = "";
-            if(req.Form.Files.Count > 0 ){
-                var file = req.Form.Files[0];
+        // Create entity and store blob if present
+        // This creates automatically new GUID for the content
+        var entity = new ContentEntity(content);
 
-                using (var stream = file.OpenReadStream())
-                {
-                    await blobClient.UploadAsync(stream, true);
-                    URI = blobClient.Uri.AbsoluteUri;
-                }
-            }
-            content.Url = URI;
-        }
-        
-        if (content != null)
-        { 
-            content.Id = Guid.NewGuid();
-            var entity = new ContentEntity(content);
-            if(content.Type != "url")
-                entity.BlobName = blobClient.Name;
-            var add = await _storage.UpsertAsync(entity);
-            if (!add)
-                return new InternalServerErrorResult(); 
-        }
-        else
+        if (content.Type.Value.IsBlobType())
         {
-            return new InternalServerErrorResult();
+            if (req.Form.Files.Count != 1)
+                return new BadRequestResult();
+
+            // Get a reference to a blob with unique id
+            BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
+            using var stream = req.Form.Files[0].OpenReadStream();
+            await blobClient.UploadAsync(stream);
+            content.Url = blobClient.Uri.AbsoluteUri;
+        }
+        else if (string.IsNullOrEmpty(content.Url))
+        {
+            return new BadRequestResult();
         }
 
-        return new ObjectResult(content);
+        // TODO: Add keywords to index, create search index for content
+        // TODO: Create embedding
+
+        // Insert content entity
+        var result = await _storage.UpsertAsync(entity);
+        if (!result)
+            return new InternalServerErrorResult();
+
+        return new ObjectResult(entity.ToModel());
     }
 
 
@@ -171,7 +169,7 @@ public class Content_v1
     [OpenApiOperation(
             operationId: "putContent",
             tags: ["Content"],
-            Summary = "Edit existing Content")]
+            Summary = "Edit existing content")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",
             schemeType: SecuritySchemeType.Http,
@@ -193,62 +191,47 @@ public class Content_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent))
             return new UnauthorizedResult();
 
-        if (!Guid.TryParse(id, out Guid contentId))
+        if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
-        
+
         var entity = await _storage.RetrieveAsync<ContentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
+        var original = entity.ToModel();
 
         var formData = await req.ReadFormAsync();
-
         if (formData == null)
             return new BadRequestResult();
-        string blobName = "";
-        formData.TryGetValue("json", out var json);      
+
+        formData.TryGetValue("json", out var json);
+
         var content = json.ToString().JsonToObject<Content>();
+        if (content == null)
+            return new BadRequestResult();
 
-        if(entity.BlobName != "" && !String.IsNullOrEmpty(content.BlobName)){
-            //remove the old media file, dosent matter if it is the same
-            await _container.DeleteBlobAsync(entity.BlobName);
-            entity.Url = "";
-            entity.BlobName = "";
-        }
+        // Update entity
 
-        if(req.Form.Files.Count > 0 )
-        {
-            var file = req.Form.Files[0];
-
-            if(content != null && content.Type != "url"){
-                using (var stream = file.OpenReadStream())
-                {
-                    blobName = Guid.NewGuid().ToString();
-                    // Get a reference to a blob with unique id
-                    BlobClient blobClient = _container.GetBlobClient(blobName);
-                    await blobClient.UploadAsync(stream, true);
-                    entity.Url = blobClient.Uri.AbsoluteUri;
-                    entity.BlobName = blobName;
-                }
-            }  
-        }
-      
-        // Update entity data
         if (content.Name != null)
             entity.Name = content.Name;
 
         if (content.Description != null)
-            entity.Description =  content.Description;
+            entity.Description = content.Description;
 
-        if (content.Hidden != null)
+        if (content.Hidden.HasValue)
             entity.Hidden = content.Hidden;
 
-        if (content.Type != null)
-            entity.Type = content.Type;
+        if (content.Type.HasValue)
+        {
+            // Must match the original type
+            if (content.Type != original.Type)
+                return new BadRequestResult();
+        }
 
-        if (content.Url != null)
-            entity.Url = content.Url;
-        else
-            entity.Url = "";
+        if (content.Type == ContentType.URL)
+        {
+            if (string.IsNullOrEmpty(content.Url))
+                entity.URI = content.Url;
+        }
 
         if (content.ViewsCount != null)
             entity.ViewsCount = content.ViewsCount;
@@ -256,15 +239,26 @@ public class Content_v1
         if (content.ViewersRating != null)
             entity.ViewersRating = content.ViewersRating;
 
-        if (content.InjuredType != null)
-            entity.InjuredType = content.InjuredType;
-        
         if (content.Keywords != null)
-            entity.Keywords = String.Join(",", content.Keywords);
+            entity.Keywords = string.Join(",", content.Keywords);
+
+        // TODO: Update keyword and search index
+        // TODO: Update embedding
+
+        // Got new blob?
+        if (req.Form.Files.Count > 0)
+        {
+            if (original.Type == ContentType.URL)
+                return new BadRequestResult();
+
+            using var stream = req.Form.Files[0].OpenReadStream();
+            var blobClient = _blobs.GetBlobClient(entity.Id());
+            await blobClient.UploadAsync(stream, true);
+        }
 
         // Apply edits
-        var save = await _storage.UpsertAsync(entity);
-        if (!save)
+        var result = await _storage.UpsertAsync(entity);
+        if (!result)
             return new InternalServerErrorResult();
 
         return new ObjectResult(content);
@@ -273,9 +267,9 @@ public class Content_v1
 
     [Function("DeleteContent_v1")]
     [OpenApiOperation(
-        operationId: "deleteContentWithId",
+        operationId: "deleteContent",
         tags: ["content"],
-        Summary = "Delete a content")]
+        Summary = "Delete content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
         schemeType: SecuritySchemeType.Http,
@@ -300,63 +294,25 @@ public class Content_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteContent))
             return new ForbiddenResult();
 
-        if (!Guid.TryParse(id, out Guid contentId))
+        if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
 
         var entity = await _storage.RetrieveAsync<ContentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
-    
-        if(entity.BlobName != null)
-            _container.DeleteBlobAsync(entity.BlobName);
+
+        var content = entity.ToModel();
+        if (content.Type!.Value.IsBlobType())
+        {
+            await _blobs.DeleteBlobIfExistsAsync(entity.Id());
+        }
+
+        // TODO: Update search index
+        // TODO: Remove embedding
 
         var delete = await _storage.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
-        
-        return new NoContentResult();
-    }
-
-
-
-     [Function("DeleteMedia_v1")]
-    [OpenApiOperation(
-        operationId: "deleteMediaWithId",
-        tags: ["content"],
-        Summary = "Delete a Media")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
-        Scheme = OpenApiSecuritySchemeType.Bearer,
-        BearerFormat = "JWT",
-        Description = "User token")]
-    [OpenApiParameter("id", Description = "Content identifier", In = ParameterLocation.Path, Required = true)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Operation was successful")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    public async Task<IActionResult> DeleteMedia(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/content-Media/{id}")] HttpRequest req,
-        FunctionContext context,
-        string id)
-    {
-        var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
-            return new UnauthorizedResult();
-
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteContent))
-            return new ForbiddenResult();
-
-        if (!Guid.TryParse(id, out Guid contentId))
-            return new BadRequestResult();
-
-        var entity = await _storage.RetrieveAsync<ContentEntity>(id);
-        if (entity == null)
-            return new NotFoundResult();
-    
-        if(entity.BlobName != null)
-            await _container.DeleteBlobAsync(entity.BlobName);
 
         return new NoContentResult();
     }
