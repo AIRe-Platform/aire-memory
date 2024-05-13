@@ -44,11 +44,14 @@ public class ContentEntity : BaseTableEntity
         Type = content.Type.ObjectToJson();
         ViewsCount = content.ViewsCount;
         ViewersRating = content.ViewersRating;
-        Keywords = string.Join(",", content.Keywords!);
+        Keywords = string.Join(",", content.Keywords ?? []);
 
-        if(Uri.TryCreate(content.Url, UriKind.Absolute, out Uri? uri))
+        if(content.Type == ContentType.URL)
         {
-            URI = uri.AbsoluteUri;
+            if(Uri.TryCreate(content.Url, UriKind.Absolute, out Uri? uri))
+            {
+                URI = uri.AbsoluteUri;
+            }
         }
     }
 
