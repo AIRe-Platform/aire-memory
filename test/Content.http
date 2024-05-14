@@ -8,6 +8,12 @@ GET {{base_url}}/v1/contents HTTP/1.1
 Accept: application/json
 Authorization: Bearer {{token}}
 
+### Get one content
+@content_id = 80c6780c-c5b8-4c8d-871c-27644f22591c
+GET {{base_url}}/v1/content/{{content_id}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
 ### Save a content
 
 POST {{base_url}}/v1/content HTTP/1.1
@@ -28,3 +34,9 @@ Authorization: Bearer {{token}}
     "viewers_rating": 6,
     "modified": "0001-01-01T00:00:00",
 }
+
+### Search content
+@query = test
+GET {{base_url}}/v1/content?query={{query}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}

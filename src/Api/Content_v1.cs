@@ -41,9 +41,6 @@ public class Content_v1
 
     }
 
-    // TODO: Implement API to search for content
-    // TODO: Implement API to retrieve content by ID
-
     [Function("GetContents_v1")]
     [OpenApiOperation(
         operationId: "getContents",
@@ -90,6 +87,114 @@ public class Content_v1
             }
 
             return model;
+        });
+
+        return new ObjectResult(list);
+    }
+
+    [Function("GetContentWithId_v1")]
+    [OpenApiOperation(
+        operationId: "getContentWithId",
+        tags: ["content"],
+        Summary = "Retrieve a content")]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiParameter("id", Description = "Content identifier", In = ParameterLocation.Path, Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "A content")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> GetContenteWithId(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content/{id}")] HttpRequest req,
+        FunctionContext context,
+        string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
+            return new ForbiddenResult();
+
+        if (string.IsNullOrWhiteSpace(id))
+            return new BadRequestResult();
+
+        var entity = await _storage.RetrieveAsync<ContentEntity>(id);
+        if (entity == null)
+            return new NotFoundResult();
+
+        var model = entity.ToModel();
+        return new ObjectResult(model);
+    }
+
+    [Function("SearchContent_v1")]
+    [OpenApiOperation(
+        operationId: "searchContent",
+        tags: ["content"],
+        Summary = "Search for content"
+    )]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiParameter("query",
+        CollectionDelimiter = OpenApiParameterCollectionDelimiterType.Comma,
+        In = ParameterLocation.Query,
+        Required = true,
+        Description = "List of keywords separated by commas")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Content>), Description = "List of found contents")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> SearchContent(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content")] HttpRequest req,
+        FunctionContext context,
+        [FromQuery] string query)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
+            return new ForbiddenResult();
+
+        if (string.IsNullOrWhiteSpace(query))
+            return new BadRequestResult();
+
+        var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var all = await _storage.All<ContentEntity>();
+        var list = new List<Content>();
+        all.ForEach(x =>
+        {
+            var model = x.ToModel();
+
+            if (model.Keywords != null && model.Keywords.Any(item => queryWords.Contains(item)))
+            {
+                if (model.Type != ContentType.URL)
+                {
+                    var blobSasBuilder = new BlobSasBuilder()
+                    {
+                        BlobContainerName = AireConstants.Blobs.Contents,
+                        ExpiresOn = DateTime.UtcNow.AddMinutes(15),
+                    };
+
+                    BlobClient blobClient = _blobs.GetBlobClient(x.Id());
+                    blobSasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+                    var sasUri = blobClient.GenerateSasUri(blobSasBuilder);
+                    model.Url = sasUri.AbsoluteUri;
+                }
+                list.Add(model);
+            }
         });
 
         return new ObjectResult(list);
