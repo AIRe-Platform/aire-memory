@@ -16,6 +16,7 @@ using Aire.Sdk.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
+using Aire.Memory.Helpers;
 
 namespace Aire.Memory.Api;
 
@@ -258,7 +259,16 @@ public class Content_v1
             return new BadRequestResult();
         }
 
-        // TODO: Add keywords to index, create search index for content
+        // Update keywords and add content to keyword index
+        var words = await KeywordHelper.UpdateKeywords(
+            _storage,
+            ResourceTypes.Content,
+            entity.Id(),
+            [],
+            content.Keywords ?? []);
+
+        entity.Keywords = string.Join(",", words);
+
         // TODO: Create embedding
 
         // Insert content entity
@@ -345,9 +355,18 @@ public class Content_v1
             entity.ViewersRating = content.ViewersRating;
 
         if (content.Keywords != null)
-            entity.Keywords = string.Join(",", content.Keywords);
+        {
+            // Update keywords and edit content keyword index
+            var words = await KeywordHelper.UpdateKeywords(
+                _storage, 
+                ResourceTypes.Content,
+                entity.Id(),
+                original.Keywords ?? [], 
+                content.Keywords);
 
-        // TODO: Update keyword and search index
+            entity.Keywords = string.Join(",", words);
+        }
+
         // TODO: Update embedding
 
         // Got new blob?
@@ -412,7 +431,14 @@ public class Content_v1
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
 
-        // TODO: Update search index
+        // Update keywords and removw content from keyword index
+        await KeywordHelper.UpdateKeywords(
+            _storage, 
+            ResourceTypes.Content,
+            entity.Id(),
+            content.Keywords ?? [], 
+            []);
+
         // TODO: Remove embedding
 
         var delete = await _storage.DeleteAsync(entity);

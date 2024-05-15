@@ -15,6 +15,7 @@ using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Aire.Memory.Helpers;
 
 namespace Aire.Memory.Api;
 
@@ -35,7 +36,7 @@ public class Questionnaire_v1
     {
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
         _questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
-        
+
         _tables = tables;
         _jwt = jwt;
         _clientFactory = clientFactory;
@@ -230,6 +231,17 @@ public class Questionnaire_v1
         var entity = new QuestionnaireEntity(questionnaire);
 
         {
+           var words = await KeywordHelper.UpdateKeywords(
+                _tables,
+                ResourceTypes.Questionnaire,
+                entity.Id(),
+                [],
+                questionnaire.Keywords ?? []);
+
+            entity.Keywords = string.Join(",", words);
+        }
+
+        {
             var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
@@ -240,7 +252,7 @@ public class Questionnaire_v1
             entity.EmbeddingId = embedId;
         }
 
-        if(questionnaire.Content == null)
+        if (questionnaire.Content == null)
             return new BadRequestResult();
 
         await entity.SaveToBlob(_questionnaires, questionnaire.Content);
@@ -306,7 +318,18 @@ public class Questionnaire_v1
             entity.Lang = questionnaire.Lang;
 
         if (questionnaire.Keywords != null)
-            entity.Keywords = string.Join(",", questionnaire.Keywords);
+        {
+            var originalKeywords = entity.Keywords?.Split(",");
+
+            var words = await KeywordHelper.UpdateKeywords(
+                _tables,
+                ResourceTypes.Questionnaire,
+                entity.Id(),
+                originalKeywords ?? [],
+                questionnaire.Keywords);
+
+            entity.Keywords = string.Join(",", words);
+        }
 
         if (questionnaire.Content != null)
             await entity.SaveToBlob(_questionnaires, questionnaire.Content);
@@ -380,6 +403,15 @@ public class Questionnaire_v1
         var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
+
+        {
+            await KeywordHelper.UpdateKeywords(
+                _tables,
+                ResourceTypes.Questionnaire,
+                entity.Id(),
+                entity.Keywords?.Split(",") ?? [],
+                []);
+        }
 
         if (entity.EmbeddingId != null)
         {
