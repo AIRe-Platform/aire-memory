@@ -13,6 +13,7 @@ using Aire.Sdk.Azure;
 using Aire.Sdk.Models.Resources;
 using InternalErrorResult = System.Web.Http.InternalServerErrorResult;
 using Aire.Memory.Helpers;
+using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
@@ -48,7 +49,7 @@ public class Keyword_v1
         [FromQuery] string? search)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth == null && !req.IsServiceRequest())
             return new UnauthorizedResult();
 
         bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.Keywords);
