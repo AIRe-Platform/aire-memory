@@ -15,7 +15,6 @@ using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Sas;
 using Aire.Memory.Helpers;
 
 namespace Aire.Memory.Api;
@@ -73,19 +72,7 @@ public class Content_v1
             var model = x.ToModel();
 
             if (model.Type != ContentType.URL)
-            {
-                var blobSasBuilder = new BlobSasBuilder()
-                {
-                    BlobContainerName = AireConstants.Blobs.Contents,
-                    ExpiresOn = DateTime.UtcNow.AddMinutes(15),
-                };
-
-                BlobClient blobClient = _blobs.GetBlobClient(x.Id());
-                blobSasBuilder.SetPermissions(BlobSasPermissions.Read);
-
-                var sasUri = blobClient.GenerateSasUri(blobSasBuilder);
-                model.Url = sasUri.AbsoluteUri;
-            }
+                model.Url = SasHelper.GenerateContentUriString(_blobs, x.Id());
 
             return model;
         });
@@ -130,6 +117,10 @@ public class Content_v1
             return new NotFoundResult();
 
         var model = entity.ToModel();
+
+        if(model.Type != ContentType.URL)
+            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+
         return new ObjectResult(model);
     }
 
@@ -170,33 +161,39 @@ public class Content_v1
         if (string.IsNullOrWhiteSpace(query))
             return new BadRequestResult();
 
-        var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var queryWords = query
+            .Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(KeywordHelper.Sanitize)
+            .Where(x => x.Length > 1)
+            .Distinct();
 
-        var all = await _storage.All<ContentEntity>();
-        var list = new List<Content>();
-        all.ForEach(x =>
+        if (queryWords.Count() < 1)
+            return new BadRequestResult();
+
+        string filter = string.Join(" or ", queryWords.Select(x =>
         {
-            var model = x.ToModel();
+            var pk = KeywordIndexEntity.PartitionForResource(ResourceTypes.Content, x);
+            return $"PartitionKey eq '{pk}'";
+        }));
 
-            if (model.Keywords != null && model.Keywords.Any(item => queryWords.Contains(item)))
+        var queryByKeywords = await _storage.QueryAsync<KeywordIndexEntity>(filter);
+        var list = new List<Content>();
+        await foreach (var index in queryByKeywords)
+        {
+            var entity = await _storage.RetrieveAsync<ContentEntity>(index.RowKey!);
+            if (entity == null)
             {
-                if (model.Type != ContentType.URL)
-                {
-                    var blobSasBuilder = new BlobSasBuilder()
-                    {
-                        BlobContainerName = AireConstants.Blobs.Contents,
-                        ExpiresOn = DateTime.UtcNow.AddMinutes(15),
-                    };
-
-                    BlobClient blobClient = _blobs.GetBlobClient(x.Id());
-                    blobSasBuilder.SetPermissions(BlobSasPermissions.Read);
-
-                    var sasUri = blobClient.GenerateSasUri(blobSasBuilder);
-                    model.Url = sasUri.AbsoluteUri;
-                }
-                list.Add(model);
+                _log.LogWarning($"Content '{index.RowKey}' no longer exists.");
+                continue;
             }
-        });
+
+            var model = entity.ToModel();
+            if (model.Type != ContentType.URL)
+            {
+                model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+            }
+            list.Add(model);
+        }
 
         return new ObjectResult(list);
     }
@@ -252,7 +249,6 @@ public class Content_v1
             BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
             using var stream = req.Form.Files[0].OpenReadStream();
             await blobClient.UploadAsync(stream);
-            content.Url = blobClient.Uri.AbsoluteUri;
         }
         else if (string.IsNullOrEmpty(content.Url))
         {
@@ -275,6 +271,11 @@ public class Content_v1
         var result = await _storage.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
+
+        var model = entity.ToModel();
+
+        if(model.Type != ContentType.URL)
+            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
 
         return new ObjectResult(entity.ToModel());
     }
@@ -358,10 +359,10 @@ public class Content_v1
         {
             // Update keywords and edit content keyword index
             var words = await KeywordHelper.UpdateKeywords(
-                _storage, 
+                _storage,
                 ResourceTypes.Content,
                 entity.Id(),
-                original.Keywords ?? [], 
+                original.Keywords ?? [],
                 content.Keywords);
 
             entity.Keywords = string.Join(",", words);
@@ -433,10 +434,10 @@ public class Content_v1
 
         // Update keywords and removw content from keyword index
         await KeywordHelper.UpdateKeywords(
-            _storage, 
+            _storage,
             ResourceTypes.Content,
             entity.Id(),
-            content.Keywords ?? [], 
+            content.Keywords ?? [],
             []);
 
         // TODO: Remove embedding
