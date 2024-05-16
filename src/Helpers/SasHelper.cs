@@ -9,7 +9,7 @@ public static class SasHelper
     {
         var blobSasBuilder = new BlobSasBuilder()
         {
-            ExpiresOn = DateTime.UtcNow.AddMinutes(15)
+            ExpiresOn = DateTime.UtcNow.AddMinutes(60)
         };
 
         BlobClient blobClient = container.GetBlobClient(blobId);
