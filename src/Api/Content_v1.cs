@@ -248,7 +248,11 @@ public class Content_v1
             // Get a reference to a blob with unique id
             BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
             using var stream = req.Form.Files[0].OpenReadStream();
-            await blobClient.UploadAsync(stream);
+
+            //check file type
+            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+ 
+            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         }
         else if (string.IsNullOrEmpty(content.Url))
         {
@@ -369,7 +373,10 @@ public class Content_v1
         }
 
         // TODO: Update embedding
-
+        
+        //check file type
+        var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+ 
         // Got new blob?
         if (req.Form.Files.Count > 0)
         {
@@ -378,7 +385,9 @@ public class Content_v1
 
             using var stream = req.Form.Files[0].OpenReadStream();
             var blobClient = _blobs.GetBlobClient(entity.Id());
-            await blobClient.UploadAsync(stream, true);
+            
+            //With the blobUploadOptions it automatic overwrite it on the blob
+            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         }
 
         // Apply edits
