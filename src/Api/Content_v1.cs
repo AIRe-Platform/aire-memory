@@ -373,19 +373,20 @@ public class Content_v1
         }
 
         // TODO: Update embedding
-        
-        //check file type
-        var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+    
  
         // Got new blob?
         if (req.Form.Files.Count > 0)
         {
+            //check file type
+            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+
             if (original.Type == ContentType.URL)
                 return new BadRequestResult();
 
             using var stream = req.Form.Files[0].OpenReadStream();
             var blobClient = _blobs.GetBlobClient(entity.Id());
-            
+
             //With the blobUploadOptions it automatic overwrite it on the blob
             await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         }
