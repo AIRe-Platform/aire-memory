@@ -16,6 +16,8 @@ public class ContentEntity : BaseTableEntity
     public string? Type { get; set; }
     public int? ViewsCount { get; set; }
     public int? ViewersRating { get; set; }
+    public int? ThumbsUp { get; set; }
+    public int? ThumbsDown { get; set; }
     public string? Keywords { get; set; }
     public string? URI { get; set; }
 
@@ -43,6 +45,8 @@ public class ContentEntity : BaseTableEntity
         Hidden = content.Hidden;
         Type = content.Type.ObjectToJson();
         ViewsCount = content.ViewsCount;
+        ThumbsUp = content.ThumbsUp;
+        ThumbsDown = content.ThumbsDown;
         ViewersRating = content.ViewersRating;
         Keywords = string.Join(",", content.Keywords ?? []);
 
@@ -66,6 +70,8 @@ public class ContentEntity : BaseTableEntity
             Hidden = Hidden,
             Type = Type?.JsonToObject<ContentType>(),
             ViewsCount = ViewsCount,
+            ThumbsUp = ThumbsUp,
+            ThumbsDown = ThumbsDown,
             ViewersRating = ViewersRating,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             Url = URI,
