@@ -67,15 +67,9 @@ public class Content_v1
             return new ForbiddenResult();
 
         var all = await _storage.All<ContentEntity>();
-        var list = all.Select(x =>
-        {
-            var model = x.ToModel();
+        var list = all.Select(x => x.ToModel());
 
-            if (model.Type != ContentType.URL)
-                model.Url = SasHelper.GenerateContentUriString(_blobs, x.Id());
-
-            return model;
-        });
+        // Note: Not generating URLs to blobs to discourage loading all the media at once
 
         return new OkObjectResult(list);
     }
@@ -118,7 +112,7 @@ public class Content_v1
 
         var model = entity.ToModel();
 
-        if (model.Type != ContentType.URL)
+        if (model.Type.IsBlobType())
             model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
 
         return new OkObjectResult(model);
@@ -240,7 +234,7 @@ public class Content_v1
         // This creates automatically new GUID for the content
         var entity = new ContentEntity(content);
 
-        if (content.Type.Value.IsBlobType())
+        if (content.Type.IsBlobType())
         {
             if (req.Form.Files.Count != 1)
                 return new BadRequestResult();
@@ -430,7 +424,7 @@ public class Content_v1
             return new NotFoundResult();
 
         var content = entity.ToModel();
-        if (content.Type!.Value.IsBlobType())
+        if (content.Type.IsBlobType())
         {
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
