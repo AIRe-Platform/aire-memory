@@ -489,15 +489,38 @@ public class Content_v1
         if (entity == null)
             return new NotFoundResult();
 
-        //! FIXME: Keep track who has already voted for the content and revert their previous vote
+        var vote = await _storage.RetrieveAsync<ContentVoteEntity>(auth!.UserId, id);
+        if (vote != null)
+        {
+            if (vote.Value > 0)
+                entity.ThumbsUp -= 1;
+            else if (vote.Value < 0)
+                entity.ThumbsDown -= 1;
+        }
+
+        vote ??= new ContentVoteEntity(auth!.UserId, id);
 
         if (rating.Vote > 0)
+        {
             entity.ThumbsUp += 1;
+            vote.Value = 1;
+        }
         else if (rating.Vote < 0)
+        {
             entity.ThumbsDown += 1;
-            
-        var result = await _storage.UpsertAsync(entity);
-        if (!result)
+            vote.Value = -1;
+        }
+        else
+        {
+            vote.Value = 0;
+        }
+
+        var voteUpdate = await _storage.UpsertAsync(vote);
+        if (!voteUpdate)
+            return new InternalServerErrorResult();
+
+        var contentUpdate = await _storage.UpsertAsync(entity);
+        if (!contentUpdate)
             return new InternalServerErrorResult();
 
         return new OkObjectResult(entity.ToModel());
