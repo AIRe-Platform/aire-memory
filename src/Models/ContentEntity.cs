@@ -14,9 +14,9 @@ public class ContentEntity : BaseTableEntity
     public string? Description { get; set; }
     public bool? Hidden { get; set; }
     public string? Type { get; set; }
-    public int? Views { get; set; }
-    public int? ThumbsUp { get; set; }
-    public int? ThumbsDown { get; set; }
+    public int Views { get; set; }
+    public int ThumbsUp { get; set; }
+    public int ThumbsDown { get; set; }
     public string? Keywords { get; set; }
     public string? URI { get; set; }
 
@@ -43,9 +43,9 @@ public class ContentEntity : BaseTableEntity
         Description = content.Description;
         Hidden = content.Hidden;
         Type = content.Type.ObjectToJson();
-        Views = content.Views.GetValueOrDefault(0);
-        ThumbsUp = content.ThumbsUp.GetValueOrDefault(0);
-        ThumbsDown = content.ThumbsDown.GetValueOrDefault(0);
+        Views = content.Views;
+        ThumbsUp = content.ThumbsUp;
+        ThumbsDown = content.ThumbsDown;
         Keywords = string.Join(",", content.Keywords ?? []);
 
         if (content.Type == ContentType.URL)
@@ -67,10 +67,10 @@ public class ContentEntity : BaseTableEntity
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Hidden = Hidden,
             Type = Type?.JsonToObject<ContentType>(),
-            Views = Views.GetValueOrDefault(0),
-            ThumbsUp = ThumbsUp.GetValueOrDefault(0),
-            ThumbsDown = ThumbsDown.GetValueOrDefault(0),
-            Score = ThumbsUp.GetValueOrDefault(0) - ThumbsDown.GetValueOrDefault(0),
+            Views = Views,
+            ThumbsUp = ThumbsUp,
+            ThumbsDown = ThumbsDown,
+            Score = ThumbsUp - ThumbsDown,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             Url = URI,
         };
