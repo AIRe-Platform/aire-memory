@@ -14,8 +14,7 @@ public class ContentEntity : BaseTableEntity
     public string? Description { get; set; }
     public bool? Hidden { get; set; }
     public string? Type { get; set; }
-    public int? ViewsCount { get; set; }
-    public int? ViewersRating { get; set; }
+    public int? Views { get; set; }
     public int? ThumbsUp { get; set; }
     public int? ThumbsDown { get; set; }
     public string? Keywords { get; set; }
@@ -44,15 +43,14 @@ public class ContentEntity : BaseTableEntity
         Description = content.Description;
         Hidden = content.Hidden;
         Type = content.Type.ObjectToJson();
-        ViewsCount = content.ViewsCount;
-        ThumbsUp = content.ThumbsUp;
-        ThumbsDown = content.ThumbsDown;
-        ViewersRating = content.ViewersRating;
+        Views = content.Views.GetValueOrDefault(0);
+        ThumbsUp = content.ThumbsUp.GetValueOrDefault(0);
+        ThumbsDown = content.ThumbsDown.GetValueOrDefault(0);
         Keywords = string.Join(",", content.Keywords ?? []);
 
-        if(content.Type == ContentType.URL)
+        if (content.Type == ContentType.URL)
         {
-            if(Uri.TryCreate(content.Url, UriKind.Absolute, out Uri? uri))
+            if (Uri.TryCreate(content.Url, UriKind.Absolute, out Uri? uri))
             {
                 URI = uri.AbsoluteUri;
             }
@@ -69,10 +67,10 @@ public class ContentEntity : BaseTableEntity
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Hidden = Hidden,
             Type = Type?.JsonToObject<ContentType>(),
-            ViewsCount = ViewsCount,
-            ThumbsUp = ThumbsUp,
-            ThumbsDown = ThumbsDown,
-            ViewersRating = ViewersRating,
+            Views = Views.GetValueOrDefault(0),
+            ThumbsUp = ThumbsUp.GetValueOrDefault(0),
+            ThumbsDown = ThumbsDown.GetValueOrDefault(0),
+            Score = ThumbsUp.GetValueOrDefault(0) - ThumbsDown.GetValueOrDefault(0),
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             Url = URI,
         };
