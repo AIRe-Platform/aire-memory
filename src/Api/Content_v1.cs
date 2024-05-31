@@ -497,12 +497,10 @@ public class Content_v1
         var entity = await _storage.RetrieveAsync<ContentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
-        Console.WriteLine("before here", entity.ViewersRating);
 
         // Update entity
         entity.ViewersRating += rating;
 
-        Console.WriteLine("here", entity.ViewersRating);
         // Apply edits
         var result = await _storage.UpsertAsync(entity);
         if (!result)
