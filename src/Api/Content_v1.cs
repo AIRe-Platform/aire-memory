@@ -476,7 +476,7 @@ public class Content_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    public async Task<IActionResult> PutViewersRating(
+    public async Task<IActionResult> PostViewersRating(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/rating")] HttpRequest req,
             FunctionContext context,
             string id)
