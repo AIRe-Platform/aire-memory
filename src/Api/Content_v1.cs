@@ -526,30 +526,24 @@ public class Content_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    public async Task<IActionResult> PutViewersRating(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/rating")] HttpRequest req,
+    public async Task<IActionResult> PostViewsCounterContent(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/views")] HttpRequest req,
             FunctionContext context,
             string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
             return new UnauthorizedResult();
 
         if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
 
-        var body = await req.ReadJson<RatingContentRequest>();
-        if(body == null)
-            return new BadRequestResult();
-
-        var rating = body.Vote;
-        
         var entity = await _storage.RetrieveAsync<ContentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
         // Update entity
-        entity.ViewersRating += rating;
+        entity.ViewsCount += 1;
 
         // Apply edits
         var result = await _storage.UpsertAsync(entity);
