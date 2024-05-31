@@ -7,7 +7,14 @@ public static class KeywordHelper
 {
     public static string Sanitize(string? keyword)
     {
-        return keyword?.Replace("'", "").ToLower().Trim() ?? "";
+        char[] specials = [' ', '-', '_'];
+        var chars = keyword?.ToCharArray()
+            .Where(x => char.IsLetter(x) || char.IsDigit(x) || specials.Contains(x));
+
+        return new string(chars?.ToArray() ?? [])
+            .ToLower()
+            .Trim(specials)
+            .Trim();
     }
 
     public static string[] Sanitize(IEnumerable<string> keywords)
