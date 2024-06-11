@@ -386,7 +386,6 @@ public class Content_v1
         return new OkObjectResult(content);
     }
 
-
     [Function("DeleteContent_v1")]
     [OpenApiOperation(
         operationId: "deleteContent",
@@ -446,11 +445,11 @@ public class Content_v1
         return new NoContentResult();
     }
 
-    [Function("PostContentRating_v1")]
+    [Function("GetContentRating_v1")]
     [OpenApiOperation(
-            operationId: "postContentRating",
+            operationId: "getContentRating",
             tags: ["content"],
-            Summary = "Cast content rating vote")]
+            Summary = "Get user's content rating")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",
             schemeType: SecuritySchemeType.Http,
@@ -458,12 +457,48 @@ public class Content_v1
             BearerFormat = "JWT",
             Description = "User token")]
     [OpenApiParameter("id", Description = "Content identifier", Required = true)]
-    [OpenApiRequestBody("application/json", typeof(RatingContentRequest), Description = "Content rating", Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ContentRating), Description = "Content rating entity")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    public async Task<IActionResult> GetContentRatingVote(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content/{id}/rating")] HttpRequest req,
+            FunctionContext context,
+            string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
+            return new UnauthorizedResult();
+
+        if (!Guid.TryParse(id, out Guid _))
+            return new BadRequestResult();
+
+        var vote = await _storage.RetrieveAsync<ContentVoteEntity>(auth!.UserId, id);
+        var rating = new ContentRating() {
+            Vote = vote?.Value ?? 0
+        };
+
+        return new OkObjectResult(rating);
+    }
+
+    [Function("PostContentRating_v1")]
+    [OpenApiOperation(
+            operationId: "postContentRatingVote",
+            tags: ["content"],
+            Summary = "Cast user's content rating vote")]
+    [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+    [OpenApiParameter("id", Description = "Content identifier", Required = true)]
+    [OpenApiRequestBody("application/json", typeof(ContentRating), Description = "Content rating", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Updated content model")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    public async Task<IActionResult> PostViewersRating(
+    public async Task<IActionResult> PostContentRatingVote(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/rating")] HttpRequest req,
             FunctionContext context,
             string id)
@@ -475,7 +510,7 @@ public class Content_v1
         if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
 
-        var rating = await req.ReadJson<RatingContentRequest>();
+        var rating = await req.ReadJson<ContentRating>();
         if (rating == null || !rating.Vote.HasValue)
             return new BadRequestResult();
 
