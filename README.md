@@ -1,3 +1,20 @@
+## TODO: Refactor this document to have an structure like this:
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Configuration](#configuration)
+5. [Contributing](#contributing)
+6. [API Reference](#api-reference)
+7. [Testing](#testing)
+8. [Deployment](#deployment)
+9. [Roadmap](#roadmap)
+10. [FAQ](#faq)
+11. [Troubleshooting](#troubleshooting)
+12. [License](#license)
+13. [Acknowledgments](#acknowledgments)
+14. [Contact](#contact)
+
 # AIRe Memory
 
 This module handles storing the data that the AIRe platform manages.

@@ -67,17 +67,11 @@ public class Content_v1
             return new ForbiddenResult();
 
         var all = await _storage.All<ContentEntity>();
-        var list = all.Select(x =>
-        {
-            var model = x.ToModel();
+        var list = all.Select(x => x.ToModel());
 
-            if (model.Type != ContentType.URL)
-                model.Url = SasHelper.GenerateContentUriString(_blobs, x.Id());
+        // Note: Not generating URLs to blobs to discourage loading all the media at once
 
-            return model;
-        });
-
-        return new ObjectResult(list);
+        return new OkObjectResult(list);
     }
 
     [Function("GetContentWithId_v1")]
@@ -118,10 +112,10 @@ public class Content_v1
 
         var model = entity.ToModel();
 
-        if(model.Type != ContentType.URL)
+        if (model.Type.IsBlobType())
             model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
 
-        return new ObjectResult(model);
+        return new OkObjectResult(model);
     }
 
     [Function("SearchContent_v1")]
@@ -195,7 +189,7 @@ public class Content_v1
             list.Add(model);
         }
 
-        return new ObjectResult(list);
+        return new OkObjectResult(list);
     }
 
 
@@ -240,7 +234,7 @@ public class Content_v1
         // This creates automatically new GUID for the content
         var entity = new ContentEntity(content);
 
-        if (content.Type.Value.IsBlobType())
+        if (content.Type.IsBlobType())
         {
             if (req.Form.Files.Count != 1)
                 return new BadRequestResult();
@@ -248,7 +242,11 @@ public class Content_v1
             // Get a reference to a blob with unique id
             BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
             using var stream = req.Form.Files[0].OpenReadStream();
-            await blobClient.UploadAsync(stream);
+
+            //check file type
+            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+
+            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         }
         else if (string.IsNullOrEmpty(content.Url))
         {
@@ -274,10 +272,10 @@ public class Content_v1
 
         var model = entity.ToModel();
 
-        if(model.Type != ContentType.URL)
+        if (model.Type != ContentType.URL)
             model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
 
-        return new ObjectResult(entity.ToModel());
+        return new OkObjectResult(entity.ToModel());
     }
 
 
@@ -349,12 +347,6 @@ public class Content_v1
                 entity.URI = content.Url;
         }
 
-        if (content.ViewsCount != null)
-            entity.ViewsCount = content.ViewsCount;
-
-        if (content.ViewersRating != null)
-            entity.ViewersRating = content.ViewersRating;
-
         if (content.Keywords != null)
         {
             // Update keywords and edit content keyword index
@@ -373,12 +365,17 @@ public class Content_v1
         // Got new blob?
         if (req.Form.Files.Count > 0)
         {
+            //check file type
+            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+
             if (original.Type == ContentType.URL)
                 return new BadRequestResult();
 
             using var stream = req.Form.Files[0].OpenReadStream();
             var blobClient = _blobs.GetBlobClient(entity.Id());
-            await blobClient.UploadAsync(stream, true);
+
+            //With the blobUploadOptions it automatic overwrite it on the blob
+            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         }
 
         // Apply edits
@@ -386,9 +383,8 @@ public class Content_v1
         if (!result)
             return new InternalServerErrorResult();
 
-        return new ObjectResult(content);
+        return new OkObjectResult(content);
     }
-
 
     [Function("DeleteContent_v1")]
     [OpenApiOperation(
@@ -427,7 +423,7 @@ public class Content_v1
             return new NotFoundResult();
 
         var content = entity.ToModel();
-        if (content.Type!.Value.IsBlobType())
+        if (content.Type.IsBlobType())
         {
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
@@ -447,5 +443,156 @@ public class Content_v1
             return new InternalServerErrorResult();
 
         return new NoContentResult();
+    }
+
+    [Function("GetContentRating_v1")]
+    [OpenApiOperation(
+            operationId: "getContentRating",
+            tags: ["content"],
+            Summary = "Get user's content rating")]
+    [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+    [OpenApiParameter("id", Description = "Content identifier", Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ContentRating), Description = "Content rating entity")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    public async Task<IActionResult> GetContentRatingVote(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content/{id}/rating")] HttpRequest req,
+            FunctionContext context,
+            string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
+            return new UnauthorizedResult();
+
+        if (!Guid.TryParse(id, out Guid _))
+            return new BadRequestResult();
+
+        var vote = await _storage.RetrieveAsync<ContentVoteEntity>(auth!.UserId, id);
+        var rating = new ContentRating() {
+            Vote = vote?.Value ?? 0
+        };
+
+        return new OkObjectResult(rating);
+    }
+
+    [Function("PostContentRating_v1")]
+    [OpenApiOperation(
+            operationId: "postContentRatingVote",
+            tags: ["content"],
+            Summary = "Cast user's content rating vote")]
+    [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+    [OpenApiParameter("id", Description = "Content identifier", Required = true)]
+    [OpenApiRequestBody("application/json", typeof(ContentRating), Description = "Content rating", Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Updated content model")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    public async Task<IActionResult> PostContentRatingVote(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/rating")] HttpRequest req,
+            FunctionContext context,
+            string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
+            return new UnauthorizedResult();
+
+        if (!Guid.TryParse(id, out Guid _))
+            return new BadRequestResult();
+
+        var rating = await req.ReadJson<ContentRating>();
+        if (rating == null || !rating.Vote.HasValue)
+            return new BadRequestResult();
+
+        var entity = await _storage.RetrieveAsync<ContentEntity>(id);
+        if (entity == null)
+            return new NotFoundResult();
+
+        var vote = await _storage.RetrieveAsync<ContentVoteEntity>(auth!.UserId, id);
+        if (vote != null)
+        {
+            if (vote.Value > 0)
+                entity.ThumbsUp -= 1;
+            else if (vote.Value < 0)
+                entity.ThumbsDown -= 1;
+        }
+
+        vote ??= new ContentVoteEntity(auth!.UserId, id);
+
+        if (rating.Vote > 0)
+        {
+            entity.ThumbsUp += 1;
+            vote.Value = 1;
+        }
+        else if (rating.Vote < 0)
+        {
+            entity.ThumbsDown += 1;
+            vote.Value = -1;
+        }
+        else
+        {
+            vote.Value = 0;
+        }
+
+        var voteUpdate = await _storage.UpsertAsync(vote);
+        if (!voteUpdate)
+            return new InternalServerErrorResult();
+
+        var contentUpdate = await _storage.UpsertAsync(entity);
+        if (!contentUpdate)
+            return new InternalServerErrorResult();
+
+        return new OkObjectResult(entity.ToModel());
+    }
+
+    [Function("PostContentView_v1")]
+    [OpenApiOperation(
+            operationId: "postContentView",
+            tags: ["content"],
+            Summary = "Increment content view count")]
+    [OpenApiSecurity(
+            schemeName: "bearer_auth",
+            schemeType: SecuritySchemeType.Http,
+            Scheme = OpenApiSecuritySchemeType.Bearer,
+            BearerFormat = "JWT",
+            Description = "User token")]
+    [OpenApiParameter("id", Description = "Content identifier", Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Updated content model")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    public async Task<IActionResult> PostContentView(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content/{id}/views")] HttpRequest req,
+            FunctionContext context,
+            string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
+            return new UnauthorizedResult();
+
+        if (!Guid.TryParse(id, out Guid _))
+            return new BadRequestResult();
+
+        var entity = await _storage.RetrieveAsync<ContentEntity>(id);
+        if (entity == null)
+            return new NotFoundResult();
+
+        entity.Views += 1;
+
+        var result = await _storage.UpsertAsync(entity);
+        if (!result)
+            return new InternalServerErrorResult();
+
+        return new OkObjectResult(entity.ToModel());
     }
 }
