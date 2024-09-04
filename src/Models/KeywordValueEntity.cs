@@ -5,6 +5,8 @@
 
 using System.Runtime.Serialization;
 using Aire.Sdk.Azure;
+using Aire.Sdk.Helpers;
+
 using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models;
@@ -31,6 +33,7 @@ public class KeywordValueEntity : BaseTableEntity
             QuestionnaireCount = value?.GetValueOrDefault(ResourceTypes.Questionnaire) ?? 0;
         }
     }
+    public string? Translations { get; set; }
 
     public string Id()
     {
@@ -53,14 +56,29 @@ public class KeywordValueEntity : BaseTableEntity
         PartitionKey = PartitionFromValue(keyword);
         RowKey = keyword;
         Stats = [];
+        Translations = Translations;
+    }
+
+    public KeywordValueEntity(Keyword keyword)
+    {
+        PartitionKey = PartitionFromValue(keyword.Value);
+        RowKey = keyword.Value;
+        Stats = [];
+
+        Translations = keyword.Translations.ObjectToJson();
     }
 
     public Keyword ToModel()
     {
-        return new Keyword()
-        {
+        var keyword = new Keyword(){
             Value = Id(),
             Stats = Stats
         };
+
+        if(Translations != null)
+        {
+            keyword.Translations = Translations.JsonToObject<List<Translation>>();
+        }
+        return keyword;
     }
 }
