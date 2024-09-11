@@ -1,0 +1,39 @@
+@base_url = http://localhost:7073/api
+
+@token=eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwidHlwIjoiSldUIiwiY3R5IjoiSldUIn0.sZ7l-vEoXb2hHvgNyotjTfhuZ7c3xK9FMEe742E62lldPuILHcsoqEEy1TrewBCv3Z-lSNVOlkuYSHY31dwL7DafFAbify2P.aglEzdlqC0NHjjnFcQPicQ.m6sQ8H5ATuRUrtTEMOvOJBDuCQcXrlt6FZZGXF8_RwStoInF_48F-ZmRAmRYprNc-KH39-ohLBnulwYlTp61Ek60vXrm4CUJ4tzHXSocmVRD0ZLseNOm9G24IVK6Rxiw7015xHA0qk99TBtcOlrYlHmoJXPQDhq8ve7N9ycFTorVY91rCnuMQJSlAHOepJwAUth01ciJR2NVE6PuV--0zJ-Aehl-n_A8_xk-HlRQ-QfMqFAAbziLKZxQDkYcgNKKbtSz3ugBQyjny4OVk6MtXslPZmxwM7KdKaOvNYFfw6eFJTuNX0otgvTfg7BAV69EUa4h4t5DubgLCPLzO-NyrJYTMc06tRDPPzxRAq1LUANlfIWVIbM998bORpVlHpvFM87WWtbD06Rj1ymHzfITl0i5jmbALloxj1tAf6iGYZYXE_SyUUouQ_48yD_mWp99ZZAiy5hl3a0KII1THDlQloIPrFkVx7fGmayXWsXw696rACfyTaccRCmh1Esig9qv1v7pMG1jzbhc_XN8Mb_lUg.RlmgV8c4pC6n3c0CqjtEDXoyqayIswDjoAghiVp--K4
+
+@eventId=49f86206-8b8e-4356-a837-6c7dfb54d200
+
+POST {{base_url}}/v1/events HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "trigger_timestamp": 123456789,
+    "content": {
+        "message": "New test event"
+    }
+}
+
+#####
+
+
+GET {{base_url}}/v1/events HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+####
+
+POST {{base_url}}/v1/events/{{eventId}} HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "trigger_timestamp": 987654321,
+    "read_timestamp": 123456789,
+    "content": {
+        "message": "This test event is now read"
+    }
+}
