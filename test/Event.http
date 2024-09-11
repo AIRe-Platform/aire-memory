@@ -25,7 +25,7 @@ Authorization: Bearer {{token}}
 
 ####
 
-POST {{base_url}}/v1/events/{{eventId}} HTTP/1.1
+PUT {{base_url}}/v1/events/{{eventId}} HTTP/1.1
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}

@@ -17,7 +17,6 @@ using Aire.Sdk.Auth;
 using Aire.Sdk.Azure;
 using Aire.Sdk.Models.Resources;
 using InternalErrorResult = System.Web.Http.InternalServerErrorResult;
-using Aire.Memory.Helpers;
 using Aire.Sdk.Auth.Extensions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -63,7 +62,9 @@ public class ScheduledEvent_v1
         if (auth == null && !req.IsServiceRequest())
             return new UnauthorizedResult();
 
-        bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.ScheduledEvent);
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadScheduledEvent))
+            return new ForbiddenResult();
+
         var query = await _tables.QueryAsync<ScheduledEventEntity>(x => x.PartitionKey == auth!.UserId);
         var list = await query.ToListAsync();
         var events = new List<ScheduledEvent>();
@@ -137,7 +138,7 @@ public class ScheduledEvent_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PutScheduledEvent(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/events/{id}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/events/{id}")] HttpRequest req,
         FunctionContext context,
         string id)
     {
