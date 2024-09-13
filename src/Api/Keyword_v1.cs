@@ -1,3 +1,8 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
 using System.Net;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -215,6 +220,54 @@ public class Keyword_v1
         }
 
         await _tables.DeleteAsync<KeywordValueEntity>(pk, keyword);
+        return new NoContentResult();
+    }
+
+    [Function("EditKeyword_v1")]
+    [OpenApiOperation(
+        operationId: "EditKeyword",
+        tags: ["Keywords"],
+        Summary = "Edit a keyword")]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiRequestBody("application/json", typeof(KeywordCreateRequest), Description = "Edit Keyword request")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> EditKeyword(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/keyword/{keyword}")] HttpRequest req,
+        FunctionContext context,
+        string keyword)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
+            return new ForbiddenResult();
+        
+        var pk = KeywordValueEntity.PartitionFromValue(keyword);
+        if (pk == null)
+            return new BadRequestResult();
+        
+        var body = await req.ReadJson<Keyword>();
+        if(body == null)
+            return new BadRequestResult();
+
+        var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+
+        entity = new KeywordValueEntity(body);
+
+        var result = await _tables.UpsertAsync(entity);
+        if (!result)
+            return new InternalErrorResult();
+
         return new NoContentResult();
     }
 }
