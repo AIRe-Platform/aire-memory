@@ -61,7 +61,7 @@ public class KeywordValueEntity : BaseTableEntity
 
     public KeywordValueEntity(Keyword keyword)
     {
-        PartitionKey = PartitionFromValue(keyword.Value);
+        PartitionKey = PartitionFromValue(keyword.Value!);
         RowKey = keyword.Value;
         Stats = [];
 
