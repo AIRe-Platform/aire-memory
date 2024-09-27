@@ -42,7 +42,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AzureWebJobsStorage": "",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-        "AIRE_SERVICE_BASE": "http://localhost:7071/api",
+        "AIRE_SERVICE_BASE": "http://localhost:7071/api/",
         "AIRE_SERVICE_KEY": "<service key secret>",
         "TOKEN_ENCRYPTION_KEY": "<enryption key shared between platform modules>",
         "TOKEN_SIGNING_KEY": "<signing key shared between platform modules>",
