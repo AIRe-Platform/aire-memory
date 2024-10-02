@@ -72,7 +72,18 @@ public class Content_v1
             return new ForbiddenResult();
 
         var all = await _storage.All<ContentEntity>();
-        var list = all.Select(x => x.ToModel());
+        var list = all.Select(x =>
+        {
+            var model = x.ToModel();
+
+            // Optionally generate Thumbnail URL if stored in Blob Storage
+            if (!string.IsNullOrEmpty(x.ThumbnailURI))
+            {
+                model.ThumbnailUrl = SasHelper.GenerateContentUriString(_blobs, $"{x.Id()}/thumbnail");
+            }
+
+            return model;
+        }).ToList();
 
         // Note: Not generating URLs to blobs to discourage loading all the media at once
 
@@ -119,7 +130,13 @@ public class Content_v1
 
         if (model.Type.IsBlobType())
             model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
-
+        
+        // Optionally generate the Thumbnail URL if it exists
+        if (!string.IsNullOrEmpty(entity.ThumbnailURI))
+        {
+            model.ThumbnailUrl = SasHelper.GenerateContentUriString(_blobs, $"{entity.Id()}/thumbnail");
+        }
+        
         return new OkObjectResult(model);
     }
 
@@ -197,92 +214,102 @@ public class Content_v1
         return new OkObjectResult(list);
     }
 
+[Function("PostContent_v1")]
+[OpenApiOperation(
+    operationId: "postContent",
+    tags: ["content"],
+    Summary = "Store new content")]
+[OpenApiSecurity(
+    schemeName: "bearer_auth",
+    schemeType: SecuritySchemeType.Http,
+    Scheme = OpenApiSecuritySchemeType.Bearer,
+    BearerFormat = "JWT",
+    Description = "User token")]
+[OpenApiRequestBody("application/json", typeof(Content), Description = "A new content", Required = true)]
+[OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Saved content")]
+[OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+[OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+[OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+public async Task<IActionResult> PostContent(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content")] HttpRequest req,
+    FunctionContext context)
+{
+    var auth = context.Features.Get<JwtAuthFeature>();
+    if (auth == null)
+        return new UnauthorizedResult();
 
-    [Function("PostContent_v1")]
-    [OpenApiOperation(
-        operationId: "postContent",
-        tags: ["content"],
-        Summary = "Store new content")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
-        Scheme = OpenApiSecuritySchemeType.Bearer,
-        BearerFormat = "JWT",
-        Description = "User token")]
-    [OpenApiRequestBody("application/json", typeof(Content), Description = "A new content", Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Saved content")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    public async Task<IActionResult> PostContent(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content")] HttpRequest req,
-        FunctionContext context)
+    if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent))
+        return new ForbiddenResult();
+
+    var formData = await req.ReadFormAsync();
+    if (formData == null)
+        return new BadRequestResult();
+
+    formData.TryGetValue("json", out var json);
+
+    var content = json.ToString().JsonToObject<Content>();
+    if (content == null || content.Id.HasValue || !content.Type.HasValue)
+        return new BadRequestResult();
+
+    // Create entity and store blob if present
+    var entity = new ContentEntity(content);
+
+    // Handle content file if it's a blob type
+    if (content.Type.IsBlobType())
     {
-        var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
-            return new UnauthorizedResult();
-
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent))
-            return new ForbiddenResult();
-
-        var formData = await req.ReadFormAsync();
-        if (formData == null)
+        if (req.Form.Files.Count == 0)
             return new BadRequestResult();
 
-        formData.TryGetValue("json", out var json);
+        // Get a reference to a blob with unique id for the content file
+        BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
+        using var stream = req.Form.Files[0].OpenReadStream();
 
-        var content = json.ToString().JsonToObject<Content>();
-        if (content == null || content.Id.HasValue || !content.Type.HasValue)
-            return new BadRequestResult();
-
-        // Create entity and store blob if present
-        // This creates automatically new GUID for the content
-        var entity = new ContentEntity(content);
-
-        if (content.Type.IsBlobType())
-        {
-            if (req.Form.Files.Count != 1)
-                return new BadRequestResult();
-
-            // Get a reference to a blob with unique id
-            BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
-            using var stream = req.Form.Files[0].OpenReadStream();
-
-            //check file type
-            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
-
-            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
-        }
-        else if (string.IsNullOrEmpty(content.Url))
-        {
-            return new BadRequestResult();
-        }
-
-        // Update keywords and add content to keyword index
-        var words = await KeywordHelper.UpdateKeywords(
-            _storage,
-            ResourceTypes.Content,
-            entity.Id(),
-            [],
-            content.Keywords ?? []);
-
-        entity.Keywords = string.Join(",", words);
-
-        // TODO: Create embedding
-
-        // Insert content entity
-        var result = await _storage.UpsertAsync(entity);
-        if (!result)
-            return new InternalServerErrorResult();
-
-        var model = entity.ToModel();
-
-        if (model.Type != ContentType.URL)
-            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
-
-        return new OkObjectResult(entity.ToModel());
+        var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+        await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
+    }
+    else if (string.IsNullOrEmpty(content.Url))
+    {
+        return new BadRequestResult();
     }
 
+    // Handle thumbnail if present
+    if (formData.Files.Any(f => f.Name == "thumbnail"))
+    {
+        var thumbnailFile = formData.Files.First(f => f.Name == "thumbnail");
+        var thumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
+
+        using var thumbnailStream = thumbnailFile.OpenReadStream();
+        var thumbnailHttpHeader = new BlobHttpHeaders { ContentType = thumbnailFile.ContentType };
+
+        await thumbnailBlobClient.UploadAsync(thumbnailStream, new BlobUploadOptions { HttpHeaders = thumbnailHttpHeader });
+
+        // Set the ThumbnailURI in the content entity
+        entity.ThumbnailURI = thumbnailBlobClient.Uri.ToString();
+    }
+
+    // Update keywords and add content to keyword index
+    var words = await KeywordHelper.UpdateKeywords(
+        _storage,
+        ResourceTypes.Content,
+        entity.Id(),
+        [],
+        content.Keywords ?? []);
+
+
+    entity.Keywords = string.Join(",", words);
+
+    // Insert content entity
+    var result = await _storage.UpsertAsync(entity);
+    if (!result)
+        return new InternalServerErrorResult();
+
+    var model = entity.ToModel();
+
+    if (model.Type != ContentType.URL)
+        model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+
+    return new OkObjectResult(model);
+}
 
     [Function("PutContent_v1")]
     [OpenApiOperation(
@@ -339,6 +366,9 @@ public class Content_v1
         if (content.Hidden.HasValue)
             entity.Hidden = content.Hidden;
 
+        if (content.AddThumbnail.HasValue)
+            entity.AddThumbnail = content.AddThumbnail;
+
         if (content.Type.HasValue)
         {
             // Must match the original type
@@ -348,9 +378,12 @@ public class Content_v1
 
         if (content.Type == ContentType.URL)
         {
-            if (string.IsNullOrEmpty(content.Url))
+            if(!string.IsNullOrEmpty(content.Url))
                 entity.URI = content.Url;
         }
+
+        if (!string.IsNullOrEmpty(content.ThumbnailUrl))
+                entity.ThumbnailURI = content.ThumbnailUrl;
 
         if (content.Keywords != null)
         {
@@ -370,19 +403,31 @@ public class Content_v1
         // Got new blob?
         if (req.Form.Files.Count > 0)
         {
-            //check file type
-            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
+            // Loop through the files to check if there is a thumbnail
+            foreach (var file in req.Form.Files)
+            {
+                var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
 
-            if (original.Type == ContentType.URL)
-                return new BadRequestResult();
+                using var stream = file.OpenReadStream();
 
-            using var stream = req.Form.Files[0].OpenReadStream();
-            var blobClient = _blobs.GetBlobClient(entity.Id());
+                // Check if the file is a thumbnail
+                if (file.Name == "thumbnail")
+                {
+                    // Upload thumbnail to blob storage
+                    var thumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
+                    await thumbnailBlobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
 
-            //With the blobUploadOptions it automatic overwrite it on the blob
-            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
+                    // Save thumbnail URL to the entity
+                    entity.ThumbnailURI = thumbnailBlobClient.Uri.ToString();
+                }
+                else
+                {
+                    // Upload main content file to blob storage
+                    var blobClient = _blobs.GetBlobClient(entity.Id());
+                    await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
+                }
+            }
         }
-
         // Apply edits
         var result = await _storage.UpsertAsync(entity);
         if (!result)
