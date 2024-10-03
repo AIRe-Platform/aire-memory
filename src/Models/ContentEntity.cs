@@ -24,6 +24,9 @@ public class ContentEntity : BaseTableEntity
     public int ThumbsDown { get; set; }
     public string? Keywords { get; set; }
     public string? URI { get; set; }
+    public bool? AddThumbnail { get; set; }
+    public string? ThumbnailURI { get; set; }
+
 
     public ContentEntity()
     {
@@ -52,6 +55,7 @@ public class ContentEntity : BaseTableEntity
         ThumbsUp = content.ThumbsUp;
         ThumbsDown = content.ThumbsDown;
         Keywords = string.Join(",", content.Keywords ?? []);
+        AddThumbnail = content.AddThumbnail;
 
         if (content.Type == ContentType.URL)
         {
@@ -59,6 +63,9 @@ public class ContentEntity : BaseTableEntity
             {
                 URI = uri.AbsoluteUri;
             }
+        }
+        if(Uri.TryCreate(content.ThumbnailUrl, UriKind.Absolute, out Uri? thumbnailUrl)){
+            ThumbnailURI = thumbnailUrl.AbsoluteUri;
         }
     }
 
@@ -78,6 +85,8 @@ public class ContentEntity : BaseTableEntity
             Score = ThumbsUp - ThumbsDown,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             Url = URI,
+            AddThumbnail = AddThumbnail,
+            ThumbnailUrl = ThumbnailURI,
         };
 
         return model;

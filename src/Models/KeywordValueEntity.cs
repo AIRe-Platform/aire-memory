@@ -6,7 +6,6 @@
 using System.Runtime.Serialization;
 using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
-
 using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models;
@@ -20,20 +19,23 @@ public class KeywordValueEntity : BaseTableEntity
 {
     public int ContentCount { get; set; }
     public int QuestionnaireCount { get; set; }
+    public string? Translations { get; set; }
+    public string? Prompt { get; set; }
 
     [IgnoreDataMember]
-    public KeywordStats? Stats {
+    public KeywordStats? Stats
+    {
         get => new KeywordStats {
             { ResourceTypes.Content, ContentCount },
             { ResourceTypes.Questionnaire, QuestionnaireCount },
         };
 
-        set {
+        set
+        {
             ContentCount = value?.GetValueOrDefault(ResourceTypes.Content) ?? 0;
             QuestionnaireCount = value?.GetValueOrDefault(ResourceTypes.Questionnaire) ?? 0;
         }
     }
-    public string? Translations { get; set; }
 
     public string Id()
     {
@@ -50,13 +52,14 @@ public class KeywordValueEntity : BaseTableEntity
         return value[..2];
     }
 
-    public KeywordValueEntity() {}
+    public KeywordValueEntity() { }
     public KeywordValueEntity(string keyword)
     {
         PartitionKey = PartitionFromValue(keyword);
         RowKey = keyword;
         Stats = [];
-        Translations = Translations;
+        Translations = null;
+        Prompt = null;
     }
 
     public KeywordValueEntity(Keyword keyword)
@@ -64,21 +67,18 @@ public class KeywordValueEntity : BaseTableEntity
         PartitionKey = PartitionFromValue(keyword.Value!);
         RowKey = keyword.Value;
         Stats = [];
-
         Translations = keyword.Translations.ObjectToJson();
+        Prompt = keyword.Prompt;
     }
 
     public Keyword ToModel()
     {
-        var keyword = new Keyword(){
-            Value = Id(),
-            Stats = Stats
-        };
-
-        if(Translations != null)
+        return new Keyword()
         {
-            keyword.Translations = Translations.JsonToObject<List<Translation>>();
-        }
-        return keyword;
+            Value = Id(),
+            Stats = Stats,
+            Translations = Translations?.JsonToObject<List<Translation>>(),
+            Prompt = Prompt,
+        };
     }
 }
