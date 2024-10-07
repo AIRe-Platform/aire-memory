@@ -25,8 +25,6 @@ public class ContentEntity : BaseTableEntity
     public string? Keywords { get; set; }
     public string? URI { get; set; }
     public bool? AddThumbnail { get; set; }
-    public string? ThumbnailURI { get; set; }
-
 
     public ContentEntity()
     {
@@ -64,9 +62,6 @@ public class ContentEntity : BaseTableEntity
                 URI = uri.AbsoluteUri;
             }
         }
-        if(Uri.TryCreate(content.ThumbnailUrl, UriKind.Absolute, out Uri? thumbnailUrl)){
-            ThumbnailURI = thumbnailUrl.AbsoluteUri;
-        }
     }
 
     public Content ToModel()
@@ -86,7 +81,6 @@ public class ContentEntity : BaseTableEntity
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             Url = URI,
             AddThumbnail = AddThumbnail,
-            ThumbnailUrl = ThumbnailURI,
         };
 
         return model;
