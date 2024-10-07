@@ -21,7 +21,6 @@ using Aire.Sdk.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
-using Azure.Storage.Sas;
 
 namespace Aire.Memory.Api;
 
