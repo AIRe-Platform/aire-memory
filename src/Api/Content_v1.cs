@@ -73,23 +73,21 @@ public class Content_v1
             return new ForbiddenResult();
 
         var all = await _storage.All<ContentEntity>();
-        var list = all.Select(x =>
+        var list = new List<Content>();
+
+        foreach (var entity in all)
         {
-            var model = x.ToModel();
+            var model = entity.ToModel();
 
-            // Optionally generate Thumbnail URL if stored in Blob Storage
-            if (!string.IsNullOrEmpty(x.ThumbnailURI))
-            {
-                model.ThumbnailUrl = SasHelper.GenerateContentUriString(_blobs, $"{x.Id()}/thumbnail");
-            }
-
-            return model;
-        }).ToList();
-
-        // Note: Not generating URLs to blobs to discourage loading all the media at once
+            // Use the helper method to get the thumbnail URL
+            model.ThumbnailUrl = await BlobHelper.GenerateThumbnailUrlIfExists(_blobs, entity.Id());
+    
+            list.Add(model);
+        }
 
         return new OkObjectResult(list);
     }
+
 
     [Function("GetContentWithId_v1")]
     [OpenApiOperation(
@@ -108,7 +106,7 @@ public class Content_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    public async Task<IActionResult> GetContenteWithId(
+    public async Task<IActionResult> GetContentWithId(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content/{id}")] HttpRequest req,
         FunctionContext context,
         string id)
@@ -130,16 +128,16 @@ public class Content_v1
         var model = entity.ToModel();
 
         if (model.Type.IsBlobType())
-            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
-        
-        // Optionally generate the Thumbnail URL if it exists
-        if (!string.IsNullOrEmpty(entity.ThumbnailURI))
         {
-            model.ThumbnailUrl = SasHelper.GenerateContentUriString(_blobs, $"{entity.Id()}/thumbnail");
+            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
         }
-        
+
+        // Use the helper method to get the thumbnail URL
+        model.ThumbnailUrl = await BlobHelper.GenerateThumbnailUrlIfExists(_blobs, entity.Id());
+
         return new OkObjectResult(model);
     }
+
 
     [Function("SearchContent_v1")]
     [OpenApiOperation(
@@ -274,30 +272,10 @@ public class Content_v1
         }
 
         // Handle thumbnail
-        if (formData.Files.Any(f => f.Name == "thumbnail"))
-        {
-            // Thumbnail is present in the request, upload the new thumbnail
-            var thumbnailFile = formData.Files.First(f => f.Name == "thumbnail");
-            var thumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
+        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
+        if(content.ThumbnailUrl == "")
+            await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
-            using var thumbnailStream = thumbnailFile.OpenReadStream();
-            var thumbnailHttpHeader = new BlobHttpHeaders { ContentType = thumbnailFile.ContentType };
-
-            await thumbnailBlobClient.UploadAsync(thumbnailStream, new BlobUploadOptions { HttpHeaders = thumbnailHttpHeader });
-
-            // Set the ThumbnailURI in the content entity
-            entity.ThumbnailURI = thumbnailBlobClient.Uri.ToString();
-        }
-        else if (entity.ThumbnailURI != null)
-        {
-            // No thumbnail in the request and the content has an existing thumbnail
-            // Remove the existing thumbnail from blob storage
-            var existingThumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
-            await existingThumbnailBlobClient.DeleteIfExistsAsync();
-
-            // Remove the thumbnail URI from the entity
-            entity.ThumbnailURI = null;
-        }
 
         // Update keywords and add content to keyword index
         var words = await KeywordHelper.UpdateKeywords(
@@ -387,10 +365,9 @@ public class Content_v1
                 return new BadRequestResult();
         }
 
-        if (content.Type == ContentType.URL)
+        if (content.Type == ContentType.URL && !string.IsNullOrEmpty(content.Url))
         {
-            if (!string.IsNullOrEmpty(content.Url))
-                entity.URI = content.Url;
+            entity.URI = content.Url;
         }
 
         if (content.Keywords != null)
@@ -407,29 +384,9 @@ public class Content_v1
         }
 
         // Handle thumbnail upload or removal
-        if (req.Form.Files.Any(f => f.Name == "thumbnail"))
-        {
-            // Thumbnail is present, upload the new thumbnail
-            var thumbnailFile = req.Form.Files.First(f => f.Name == "thumbnail");
-            var thumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
-
-            using var thumbnailStream = thumbnailFile.OpenReadStream();
-            var thumbnailHttpHeader = new BlobHttpHeaders { ContentType = thumbnailFile.ContentType };
-
-            await thumbnailBlobClient.UploadAsync(thumbnailStream, new BlobUploadOptions { HttpHeaders = thumbnailHttpHeader });
-
-            // Update the ThumbnailURI in the content entity
-            entity.ThumbnailURI = thumbnailBlobClient.Uri.ToString();
-        }
-        else if (entity.ThumbnailURI != null)
-        {
-            // No new thumbnail uploaded and there is an existing thumbnail, so remove it
-            var existingThumbnailBlobClient = _blobs.GetBlobClient($"{entity.Id()}/thumbnail");
-            await existingThumbnailBlobClient.DeleteIfExistsAsync();
-
-            // Clear the ThumbnailURI
-            entity.ThumbnailURI = null;
-        }
+        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
+        if(content.ThumbnailUrl == "")
+            await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
         // Handle other blobs if any
         if (req.Form.Files.Count > 0)
@@ -455,6 +412,7 @@ public class Content_v1
 
         return new OkObjectResult(content);
     }
+
 
 
     [Function("DeleteContent_v1")]
