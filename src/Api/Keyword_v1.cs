@@ -57,7 +57,7 @@ public class Keyword_v1
         if (auth == null && !req.IsServiceRequest())
             return new UnauthorizedResult();
 
-        bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.Keywords);
+        bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.ReadKeywords);
 
         string filter = "";
         search = KeywordHelper.Sanitize(search);
@@ -111,7 +111,7 @@ public class Keyword_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadKeywords))
             return new ForbiddenResult();
 
         keyword = KeywordHelper.Sanitize(keyword);
@@ -153,7 +153,7 @@ public class Keyword_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteKeywords))
             return new ForbiddenResult();
 
         var body = await req.ReadJson<KeywordCreateRequest>();
@@ -202,7 +202,7 @@ public class Keyword_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteKeywords))
             return new ForbiddenResult();
 
         var pk = KeywordValueEntity.PartitionFromValue(keyword);
