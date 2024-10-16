@@ -19,6 +19,7 @@ public class ReminderEntity : BaseTableEntity
 {
     public long? TriggerTimestamp { get; set; }
     public long? ReadTimestamp { get; set; }
+    public string? ChatId { get; set; }
 
     public ReminderEntity() { }
 
@@ -46,6 +47,7 @@ public class ReminderEntity : BaseTableEntity
         RowKey = guid.ToString();
         TriggerTimestamp = reminder.TriggerTimestamp;
         ReadTimestamp = reminder.ReadTimestamp;
+        ChatId = reminder.ChatId;
     }
 
     public Reminder ToModel()
@@ -54,7 +56,8 @@ public class ReminderEntity : BaseTableEntity
         {
             Id = Guid.Parse(Id()),
             TriggerTimestamp = TriggerTimestamp,
-            ReadTimestamp = ReadTimestamp
+            ReadTimestamp = ReadTimestamp,
+            ChatId = ChatId
         };
 
         return model;
