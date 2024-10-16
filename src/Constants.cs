@@ -18,6 +18,6 @@ public static class AireConstants
         public const string Questionnaires = "questionnaires";
         public const string QuestionnaireResults = "questionnaire-results";
         public const string Contents = "contents";
-        public const string Events = "events";
+        public const string Reminders = "reminders";
     }
 }
