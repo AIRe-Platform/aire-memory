@@ -11,18 +11,19 @@ using Azure.Storage.Blobs;
 namespace Aire.Memory.Models;
 
 /// <summary>
-/// ID: PartitionKey, Rowkey
+/// PartitionKey: userId
+/// RowKey: reminderId
 /// </summary>
-[EntityTable("Events")]
-public class ScheduledEventEntity : BaseTableEntity
+[EntityTable("Reminders")]
+public class ReminderEntity : BaseTableEntity
 {
     public long? TriggerTimestamp { get; set; }
-
     public long? ReadTimestamp { get; set; }
+    public string? ChatId { get; set; }
 
-    public ScheduledEventEntity() { }
+    public ReminderEntity() { }
 
-    public ScheduledEventEntity(string userId, string? eventId = null)
+    public ReminderEntity(string userId, string? eventId = null)
     {
         PartitionKey = userId;
         RowKey = eventId ?? Guid.NewGuid().ToString();
@@ -38,30 +39,31 @@ public class ScheduledEventEntity : BaseTableEntity
         return PartitionKey ?? "";
     }
 
-    public ScheduledEventEntity(ScheduledEvent scheduledEvent, string userId)
+    public ReminderEntity(Reminder reminder, string userId)
     {
-        var guid = scheduledEvent.Id ?? Guid.NewGuid();
-
+        var guid = reminder.Id ?? Guid.NewGuid();
+        
         PartitionKey = userId;
         RowKey = guid.ToString();
-
-        TriggerTimestamp = scheduledEvent.TriggerTimestamp;
-        ReadTimestamp = scheduledEvent.ReadTimestamp;
+        TriggerTimestamp = reminder.TriggerTimestamp;
+        ReadTimestamp = reminder.ReadTimestamp;
+        ChatId = reminder.ChatId;
     }
 
-    public ScheduledEvent ToModel()
+    public Reminder ToModel()
     {
-        var model = new ScheduledEvent
+        var model = new Reminder
         {
             Id = Guid.Parse(Id()),
             TriggerTimestamp = TriggerTimestamp,
-            ReadTimestamp = ReadTimestamp
+            ReadTimestamp = ReadTimestamp,
+            ChatId = ChatId
         };
 
         return model;
     }
 
-    public async Task<ScheduledEventContent?> GetContentFromBlob(BlobContainerClient client, string userKey)
+    public async Task<ReminderContent?> GetContentFromBlob(BlobContainerClient client, string userKey)
     {
         var blob = client.GetBlobClient(Id());
         if (!blob.Exists())
@@ -71,11 +73,11 @@ public class ScheduledEventEntity : BaseTableEntity
         var reader = new StreamReader(stream);
         string data = reader.ReadToEnd();
 
-        var scheduledEventContent = EncryptionHelper.DecryptObject<ScheduledEventContent>(data, userKey);
-        return scheduledEventContent;
+        var content = EncryptionHelper.DecryptObject<ReminderContent>(data, userKey);
+        return content;
     }
 
-    public async Task SaveContentToBlob(BlobContainerClient client, ScheduledEventContent scheduledEventContent, string userKey)
+    public async Task SaveContentToBlob(BlobContainerClient client, ReminderContent scheduledEventContent, string userKey)
     {
         var encrypted = EncryptionHelper.EncryptObject(scheduledEventContent, userKey);
         var data = BinaryData.FromString(encrypted);
