@@ -258,6 +258,9 @@ public class Content_v1
             if (req.Form.Files.Count == 0)
                 return new BadRequestResult();
 
+            //save the filename
+            entity.FileName = req.Form.Files[0].FileName;
+            
             // Get a reference to a blob with unique id for the content file
             BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
             using var stream = req.Form.Files[0].OpenReadStream();
@@ -394,6 +397,7 @@ public class Content_v1
             {
                 if (file.Name != "thumbnail")
                 {
+                    entity.FileName = file.FileName;
                     // Upload main content file to blob storage
                     var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
                     using var stream = file.OpenReadStream();
