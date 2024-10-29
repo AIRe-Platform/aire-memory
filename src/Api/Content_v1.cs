@@ -480,7 +480,7 @@ public class Content_v1
     [Function("GetContentRating_v1")]
     [OpenApiOperation(
             operationId: "getContentRating",
-            tags: ["content"],
+            tags: ["Content"],
             Summary = "Get user's content rating")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",
