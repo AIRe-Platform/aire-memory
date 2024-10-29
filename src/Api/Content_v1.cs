@@ -49,7 +49,7 @@ public class Content_v1
     [Function("GetContents_v1")]
     [OpenApiOperation(
         operationId: "getContents",
-        tags: ["content"],
+        tags: ["Content"],
         Summary = "Get a list of content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -91,7 +91,7 @@ public class Content_v1
     [Function("GetContentWithId_v1")]
     [OpenApiOperation(
         operationId: "getContentWithId",
-        tags: ["content"],
+        tags: ["Content"],
         Summary = "Retrieve a content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -141,7 +141,7 @@ public class Content_v1
     [Function("SearchContent_v1")]
     [OpenApiOperation(
         operationId: "searchContent",
-        tags: ["content"],
+        tags: ["Content"],
         Summary = "Search for content"
     )]
     [OpenApiSecurity(
@@ -215,7 +215,7 @@ public class Content_v1
     [Function("PostContent_v1")]
     [OpenApiOperation(
         operationId: "postContent",
-        tags: ["content"],
+        tags: ["Content"],
         Summary = "Store new content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -421,7 +421,7 @@ public class Content_v1
     [Function("DeleteContent_v1")]
     [OpenApiOperation(
         operationId: "deleteContent",
-        tags: ["content"],
+        tags: ["Content"],
         Summary = "Delete content")]
     [OpenApiSecurity(
         schemeName: "bearer_auth",
@@ -516,7 +516,7 @@ public class Content_v1
     [Function("PostContentRating_v1")]
     [OpenApiOperation(
             operationId: "postContentRatingVote",
-            tags: ["content"],
+            tags: ["Content"],
             Summary = "Cast user's content rating vote")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",
@@ -590,7 +590,7 @@ public class Content_v1
     [Function("PostContentView_v1")]
     [OpenApiOperation(
             operationId: "postContentView",
-            tags: ["content"],
+            tags: ["Content"],
             Summary = "Increment content view count")]
     [OpenApiSecurity(
             schemeName: "bearer_auth",

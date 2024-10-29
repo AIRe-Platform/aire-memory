@@ -62,7 +62,7 @@ public class UserData_v1
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(GDPRDataCollection), Description = "Collected personal data")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Dictionary<string, object?>), Description = "Collected personal data")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetUserData(
