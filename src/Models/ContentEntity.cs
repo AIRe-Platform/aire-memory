@@ -26,6 +26,7 @@ public class ContentEntity : BaseTableEntity
     public string? URI { get; set; }
     public bool? AddThumbnail { get; set; }
     public string? FileName { get; set; }
+    public string? EmbeddingId { get; set; }
 
     public ContentEntity()
     {

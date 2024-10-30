@@ -179,7 +179,7 @@ public class Questionnaire_v1
         var questionnaireId = queryResponse.Results
             .Where(x => x.Relevance.HasValue && x.Relevance.Value > 0.7)
             .Where(x => string.IsNullOrEmpty(lang) || lang == x.Language)
-            .Select(x => x.Source)
+            .Select(x => x.Id)
             .FirstOrDefault();
 
         if (questionnaireId == null)
@@ -247,7 +247,7 @@ public class Questionnaire_v1
         }
 
         {
-            var embedResult = await aiService.EmbedQuestionnaire(questionnaire);
+            var embedResult = await aiService.CreateQuestionnaireEmbedding(questionnaire);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -354,7 +354,7 @@ public class Questionnaire_v1
             }
         }
 
-        var embed = await aiService.EmbedQuestionnaire(questionnaire);
+        var embed = await aiService.CreateQuestionnaireEmbedding(questionnaire);
         var embedId = embed?.Ids?.FirstOrDefault();
         if (embedId == null)
         {

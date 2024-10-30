@@ -21,6 +21,7 @@ using Aire.Sdk.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
+using Aire.Sdk.Platform.Clients;
 
 namespace Aire.Memory.Api;
 
@@ -28,13 +29,15 @@ public class Content_v1
 {
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
     private readonly BlobContainerClient _blobs;
+    private readonly IAireClientFactory _clientFactory;
+    private readonly ILogger _log;
 
     public Content_v1(
         BlobServiceClient blobs,
         ITableStorageService storage,
         IJwtTokenService jwt,
+        IAireClientFactory clientFactory,
         ILogger<Content_v1> log)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Contents);
@@ -42,8 +45,8 @@ public class Content_v1
 
         _storage = storage;
         _jwt = jwt;
+        _clientFactory = clientFactory;
         _log = log;
-
     }
 
     [Function("GetContents_v1")]
@@ -80,7 +83,7 @@ public class Content_v1
 
             // Use the helper method to get the thumbnail URL
             model.ThumbnailUrl = await BlobHelper.GenerateThumbnailUrlIfExists(_blobs, entity.Id());
-    
+
             list.Add(model);
         }
 
@@ -249,6 +252,13 @@ public class Content_v1
         if (content == null || content.Id.HasValue || !content.Type.HasValue)
             return new BadRequestResult();
 
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
         // Create entity and store blob if present
         var entity = new ContentEntity(content);
 
@@ -260,7 +270,7 @@ public class Content_v1
 
             //save the filename
             entity.FileName = req.Form.Files[0].FileName;
-            
+
             // Get a reference to a blob with unique id for the content file
             BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
             using var stream = req.Form.Files[0].OpenReadStream();
@@ -275,7 +285,7 @@ public class Content_v1
 
         // Handle thumbnail
         content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
-        if(content.ThumbnailUrl == "")
+        if (content.ThumbnailUrl == "")
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
 
@@ -289,12 +299,22 @@ public class Content_v1
 
         entity.Keywords = string.Join(",", words);
 
+        var model = entity.ToModel();
+        {
+            var embedResult = await aiService.CreateContentEmbedding(model);
+            var embedId = embedResult?.Ids?.FirstOrDefault();
+            if (embedId == null)
+            {
+                _log.LogCritical("Failed to create embeddings for the questionnaire");
+                return new InternalServerErrorResult();
+            }
+            entity.EmbeddingId = embedId;
+        }
+
         // Insert content entity
         var result = await _storage.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
-
-        var model = entity.ToModel();
 
         if (model.Type != ContentType.URL)
             model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
@@ -331,6 +351,13 @@ public class Content_v1
 
         if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
+
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
 
         var entity = await _storage.RetrieveAsync<ContentEntity>(id);
         if (entity == null)
@@ -387,7 +414,7 @@ public class Content_v1
 
         // Handle thumbnail upload or removal
         content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
-        if(content.ThumbnailUrl == "")
+        if (content.ThumbnailUrl == "")
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
         // Handle other blobs if any
@@ -408,10 +435,34 @@ public class Content_v1
             }
         }
 
+        // Update embedding
+        {
+            if (entity.EmbeddingId != null)
+            {
+                bool result = await aiService.DeleteContentEmbedding(entity.EmbeddingId);
+                if (!result)
+                {
+                    _log.LogCritical("Failed to delete content embedding");
+                    return new InternalServerErrorResult();
+                }
+            }
+
+            var embed = await aiService.CreateContentEmbedding(content);
+            var embedId = embed?.Ids?.FirstOrDefault();
+            if (embedId == null)
+            {
+                _log.LogCritical("Failed to create embedding for the content");
+                return new InternalServerErrorResult();
+            }
+            entity.EmbeddingId = embedId;
+        }
+
         // Apply edits
-        var result = await _storage.UpsertAsync(entity);
-        if (!result)
-            return new InternalServerErrorResult();
+        {
+            var result = await _storage.UpsertAsync(entity);
+            if (!result)
+                return new InternalServerErrorResult();
+        }
 
         return new OkObjectResult(content);
     }
@@ -468,7 +519,22 @@ public class Content_v1
             content.Keywords ?? [],
             []);
 
-        // TODO: Remove embedding
+        if (entity.EmbeddingId != null)
+        {
+            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
+            if (aiService == null)
+            {
+                _log.LogCritical("Default AI module not configured");
+                return new InternalServerErrorResult();
+            }
+
+            bool result = await aiService.DeleteContentEmbedding(entity.EmbeddingId);
+            if (!result)
+            {
+                _log.LogCritical("Failed to delete content embedding");
+                return new InternalServerErrorResult();
+            }
+        }
 
         var delete = await _storage.DeleteAsync(entity);
         if (!delete)
@@ -506,7 +572,8 @@ public class Content_v1
             return new BadRequestResult();
 
         var vote = await _storage.RetrieveAsync<ContentVoteEntity>(auth!.UserId, id);
-        var rating = new ContentRating() {
+        var rating = new ContentRating()
+        {
             Vote = vote?.Value ?? 0
         };
 
