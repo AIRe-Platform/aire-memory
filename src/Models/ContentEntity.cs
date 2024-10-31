@@ -27,6 +27,8 @@ public class ContentEntity : BaseTableEntity
     public bool? AddThumbnail { get; set; }
     public string? FileName { get; set; }
     public string? ThumbnailFileName { get; set; }
+    public string? EmbeddingId { get; set; }
+
     public ContentEntity()
     {
         string id = Guid.NewGuid().ToString();
