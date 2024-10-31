@@ -26,7 +26,7 @@ public class ContentEntity : BaseTableEntity
     public string? URI { get; set; }
     public bool? AddThumbnail { get; set; }
     public string? FileName { get; set; }
-
+    public string? ThumbnailFileName { get; set; }
     public ContentEntity()
     {
         string id = Guid.NewGuid().ToString();
@@ -56,7 +56,8 @@ public class ContentEntity : BaseTableEntity
         Keywords = string.Join(",", content.Keywords ?? []);
         AddThumbnail = content.AddThumbnail;
         FileName = content.FileName;
-        
+        ThumbnailFileName = content.ThumbnailFileName;
+
         if (content.Type == ContentType.URL)
         {
             if (Uri.TryCreate(content.Url, UriKind.Absolute, out Uri? uri))
@@ -84,6 +85,7 @@ public class ContentEntity : BaseTableEntity
             Url = URI,
             AddThumbnail = AddThumbnail,
             FileName = FileName,
+            ThumbnailFileName = ThumbnailFileName
         };
 
         return model;

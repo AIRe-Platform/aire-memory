@@ -252,32 +252,39 @@ public class Content_v1
         // Create entity and store blob if present
         var entity = new ContentEntity(content);
 
-        // Handle content file if it's a blob type
-        if (content.Type.IsBlobType())
+        // Iterate over form files to separate main content and thumbnail
+        foreach (var file in req.Form.Files)
         {
-            if (req.Form.Files.Count == 0)
-                return new BadRequestResult();
+            using var stream = file.OpenReadStream();
 
-            //save the filename
-            entity.FileName = req.Form.Files[0].FileName;
-            
-            // Get a reference to a blob with unique id for the content file
-            BlobClient blobClient = _blobs.GetBlobClient(entity.Id());
-            using var stream = req.Form.Files[0].OpenReadStream();
+            if (file.Name == "thumbnail")
+            {
+                // Handle thumbnail upload by creating a temporary collection
+                var thumbnailCollection = new FormFileCollection { file };
+                content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(thumbnailCollection, _blobs, entity.Id());
+                entity.ThumbnailFileName = file.FileName;
+            }
+            else
+            {
+                // Handle main content file upload if the content type is blob-based
+                if (content.Type.IsBlobType())
+                {
+                    entity.FileName = file.FileName;
 
-            var blobHttpHeader = new BlobHttpHeaders { ContentType = req.Form.Files[0].ContentType };
-            await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
+                    var blobClient = _blobs.GetBlobClient(entity.Id());
+                    var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
+                    await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
+                }
+                else if (string.IsNullOrEmpty(content.Url))
+                {
+                    return new BadRequestResult();
+                }
+            }
         }
-        else if (string.IsNullOrEmpty(content.Url))
-        {
-            return new BadRequestResult();
-        }
 
-        // Handle thumbnail
-        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
         if(content.ThumbnailUrl == "")
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
-
+        
 
         // Update keywords and add content to keyword index
         var words = await KeywordHelper.UpdateKeywords(
@@ -387,8 +394,12 @@ public class Content_v1
 
         // Handle thumbnail upload or removal
         content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
-        if(content.ThumbnailUrl == "")
+
+        if(content.ThumbnailUrl == ""){
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
+            entity.ThumbnailFileName = "";
+        }
+            
 
         // Handle other blobs if any
         if (req.Form.Files.Count > 0)
@@ -405,6 +416,8 @@ public class Content_v1
                     var blobClient = _blobs.GetBlobClient(entity.Id());
                     await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
                 }
+                else
+                    entity.ThumbnailFileName = file.FileName;
             }
         }
 
