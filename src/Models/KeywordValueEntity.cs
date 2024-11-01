@@ -23,9 +23,10 @@ public class KeywordValueEntity : BaseTableEntity
     public string? Prompt { get; set; }
 
     [IgnoreDataMember]
-    public KeywordStats? Stats
+    public Dictionary<string, dynamic>? Stats
     {
-        get => new KeywordStats {
+        get => new()
+        {
             { ResourceTypes.Content, ContentCount },
             { ResourceTypes.Questionnaire, QuestionnaireCount },
         };
