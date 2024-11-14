@@ -97,6 +97,7 @@ public class Questionnaire_v1
         "application/json",
         typeof(List<Questionnaire>),
         Description = "List of questionnaires containing querried keyword")]
+    [OpenApiParameter("keyword", Description = "Keyword to query", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
