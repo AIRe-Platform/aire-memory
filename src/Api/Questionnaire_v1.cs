@@ -21,8 +21,6 @@ using Aire.Sdk.Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace Aire.Memory.Api;
 
