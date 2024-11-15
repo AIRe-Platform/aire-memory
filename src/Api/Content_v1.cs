@@ -209,6 +209,7 @@ public class Content_v1
             {
                 model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
             }
+                        
             list.Add(model);
         }
 
@@ -262,6 +263,9 @@ public class Content_v1
         // Create entity and store blob if present
         var entity = new ContentEntity(content);
 
+        if (content.Copyright != null)
+            entity.Copyright = content.Copyright;
+        
         // Iterate over form files to separate main content and thumbnail
         foreach (var file in req.Form.Files)
         {
@@ -317,7 +321,11 @@ public class Content_v1
             }
             entity.EmbeddingId = embedId;
         }
+        
+        if (entity.Copyright != null)
+            model.Copyright = entity.Copyright;
 
+        
         // Insert content entity
         var result = await _storage.UpsertAsync(entity);
         if (!result)
@@ -394,6 +402,9 @@ public class Content_v1
         if (content.AddThumbnail.HasValue)
             entity.AddThumbnail = content.AddThumbnail;
 
+        if (content.Copyright != null)
+            entity.Copyright = content.Copyright;
+        
         if (content.Type.HasValue)
         {
             // Must match the original type
