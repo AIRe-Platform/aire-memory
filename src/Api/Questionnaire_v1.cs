@@ -80,6 +80,64 @@ public class Questionnaire_v1
         return new ObjectResult(list);
     }
 
+    [Function("GetQuestionnairesWithKeyword_v1")]
+    [OpenApiOperation(
+        operationId: "getQuestionnairesWithKeyword",
+        tags: ["Questionnaires"],
+        Summary = "Get questionnaires with keyword"
+    )]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiResponseWithBody(
+        HttpStatusCode.OK,
+        "application/json",
+        typeof(List<Questionnaire>),
+        Description = "List of questionnaires containing querried keyword")]
+    [OpenApiParameter("keyword", Description = "Keyword to query", In = ParameterLocation.Path, Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> GetQuestionnairesWithKeyword(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaires/{keyword}")] HttpRequest req,
+        FunctionContext context,
+        string keyword)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth is null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+            return new ForbiddenResult();
+
+        keyword = KeywordHelper.Sanitize(keyword);
+        if (string.IsNullOrWhiteSpace(keyword))
+            return new BadRequestResult();
+
+        var questionnaires = new List<Questionnaire>();
+        var indexes = await _tables.Partition<KeywordIndexEntity>(
+            KeywordIndexEntity.PartitionForResource(ResourceTypes.Questionnaire, keyword)!);
+        if (indexes is null || indexes.Count == 0)
+            return new ObjectResult(questionnaires);
+
+        foreach (var index in indexes)
+        {
+            if (index.RowKey is null)
+                continue;
+
+            var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
+            if (entity is null)
+                continue;
+
+            questionnaires.Add(await entity.ToModelAsync(_questionnaires));
+        }
+
+        return new ObjectResult(questionnaires);
+    }
+
     [Function("GetQuestionnaireWithId_v1")]
     [OpenApiOperation(
         operationId: "getQuestionnaireWithId",
