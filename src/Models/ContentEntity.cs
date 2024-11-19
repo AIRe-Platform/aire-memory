@@ -28,7 +28,6 @@ public class ContentEntity : BaseTableEntity
     public string? FileName { get; set; }
     public string? ThumbnailFileName { get; set; }
     public string? EmbeddingId { get; set; }
-    public long DateContentShown { get; set; }
     public string? Copyright { get; set; }
 
     public ContentEntity()
@@ -61,7 +60,6 @@ public class ContentEntity : BaseTableEntity
         AddThumbnail = content.AddThumbnail;
         FileName = content.FileName;
         ThumbnailFileName = content.ThumbnailFileName;
-        DateContentShown = content.DateContentShown;
         Copyright = content.Copyright;
 
         if (content.Type == ContentType.URL)
@@ -92,7 +90,6 @@ public class ContentEntity : BaseTableEntity
             AddThumbnail = AddThumbnail,
             FileName = FileName,
             ThumbnailFileName = ThumbnailFileName,
-            DateContentShown = DateContentShown,
             Copyright = Copyright,
         };
 
