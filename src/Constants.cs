@@ -20,4 +20,9 @@ public static class AireConstants
         public const string Contents = "contents";
         public const string Reminders = "reminders";
     }
+
+    public static class Tables
+    {
+        public const string Statistics = "Statistics";
+    }
 }
