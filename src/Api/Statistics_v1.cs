@@ -73,7 +73,18 @@ public class Statistics_v1
 
         var filter = StatisticsEntity.CreateFilter(from.Value, to, eventNamePrefix);
         var query = await _storage.QueryAsync<StatisticsEntity>(filter);
-        var results = query.Select(x => x.ToModel());
+        var resultsByEventName = query.Select(x => x.ToModel()).GroupBy(x => x.EventName);
+
+        var results = new List<StatisticsEventInfo>();
+        await foreach (var g in resultsByEventName)
+        {
+            var info = new StatisticsEventInfo()
+            {
+                EventName = g.Key,
+                EventCount = await g.SumAsync(x => x.EventCount)
+            };
+            results.Add(info);
+        }
 
         return new OkObjectResult(results);
     }
@@ -101,7 +112,7 @@ public class Statistics_v1
         FunctionContext context,
         [FromQuery] string? events,
         [FromQuery] DateTime? from,
-        [FromQuery] DateTime? end)
+        [FromQuery] DateTime? to)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
@@ -118,7 +129,7 @@ public class Statistics_v1
 
         foreach (var e in eventNames)
         {
-            var filter = StatisticsHelper.GenerateEventPartitionFilter(e, from.Value, end);
+            var filter = StatisticsHelper.GenerateEventPartitionFilter(e, from.Value, to);
             var query = await _stats.QueryAsync<TableEntity>(filter).ToListAsync();
             var models = query.Select(StatisticsHelper.EventEntityToModel);
             results.AddRange(models);
