@@ -1,0 +1,51 @@
+@base_url = http://localhost:7073/api
+@token=
+
+### Query stats info
+@date=2024-12-03T00:00:00.000Z
+@prefix=test
+
+GET {{base_url}}/v1/stats?from={{date}}&eventNamePrefix={{prefix}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Query events
+@start=2024-12-03T00:00:00.000Z
+@end=2024-12-04T00:00:00.000Z
+@events=test.event
+
+GET {{base_url}}/v1/stats/events?from={{start}}&to={{end}}&events={{events}} HTTP/1.1
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Post event
+POST {{base_url}}/v1/stats/event HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "ts": "2024-12-03T12:34:56.789Z",
+    "event_name": "test.event",
+    "client_id": "tester_client",
+    "client_ver": "1.0",
+    "OptionalStringValue": "This is a test",
+    "OptionalNumberValue": 420,
+}
+
+### Update event
+@id=d60a3903-5cdc-4897-8a31-43342d9156cb
+PUT {{base_url}}/v1/stats/event/{{id}} HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "ts": "2024-12-03T12:34:56.789Z",
+    "event_name": "test.event",
+    "client_id": "tester_client",
+    "client_ver": "1.0",
+    "OptionalStringValue": "This is an update test",
+    "OptionalNumberValue": 123,
+}
+
