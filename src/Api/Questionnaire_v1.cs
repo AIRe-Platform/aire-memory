@@ -570,4 +570,49 @@ public class Questionnaire_v1
 
         return new NoContentResult();
     }
+
+    [Function("QueryFeedbackLanguages_v1")]
+    [OpenApiOperation(
+        operationId: "queryFeedbackLanguages",
+        tags: ["Questionnaires"],
+        Summary = "Query languages that already have feedback questionnaires"
+    )]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<string>), Description = "List of languages with feedback questionnaires")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> QueryFeedbackLanguages(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/feedback-languages")] HttpRequest req,
+        FunctionContext context)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+            return new ForbiddenResult();
+
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        // Retrieve all feedback questionnaires
+        var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
+
+        // Get a list of distinct languages for the feedback questionnaires
+        var feedbackLanguages = await feedbackQuestionnaires
+            .Select(q => q.Lang)
+            .Distinct()
+            .ToListAsync();
+
+        return new ObjectResult(feedbackLanguages);
+    }
 }
