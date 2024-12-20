@@ -59,23 +59,11 @@ public class Keyword_v1
 
         bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.ReadKeywords);
 
-        string filter = "";
         search = KeywordHelper.Sanitize(search);
 
-        if (search.Length > 0 && search.Length < 2)
-        {
-            char a = search[0], b = (char)(a + 1);
-            filter = $"PartitionKey ge '{a}' and PartitionKey lt '{b}'";
-        }
-        else if (search.Length >= 2)
-        {
-            string pk = KeywordValueEntity.PartitionFromValue(search)!;
-            string stop = search[..^1] + (char)(search[^1] + 1);
-            filter = $"PartitionKey eq '{pk}' and RowKey ge '{search}' and RowKey lt '{stop}'";
-        }
-
-        var query = await _tables.QueryAsync<KeywordValueEntity>(filter);
-        var results = await query.ToListAsync();
+        var query = await _tables.All<KeywordValueEntity>();
+        var results = query.Where(x => x.RowKey!.Contains(search));
+        
         var list = results.Select(x =>
         {
             var model = x.ToModel();
