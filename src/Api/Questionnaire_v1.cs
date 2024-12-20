@@ -296,14 +296,18 @@ public class Questionnaire_v1
         // Retrieve all feedback questionnaires matching the IsFeedback = true condition
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
 
-        // Await the AsyncPageable and take the first result (if any)
-        var feedbackQuestionnaire = await feedbackQuestionnaires.FirstOrDefaultAsync();
+        //filter by language
+        var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
+    
+        //if not in seleected language, then English
+        if (feedbackQuestionnaire == null)
+        {
+            feedbackQuestionnaire = await feedbackQuestionnaires
+                .Where(q => q.Lang == "en")
+                .FirstOrDefaultAsync();
+        }
 
         if (feedbackQuestionnaire == null)
-            return new NotFoundResult();
-
-        // Optionally filter by language if provided
-        if (!string.IsNullOrEmpty(lang) && feedbackQuestionnaire.Lang != lang)
             return new NotFoundResult();
 
         // Map the questionnaire entity to the model
