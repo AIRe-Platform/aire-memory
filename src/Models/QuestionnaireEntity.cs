@@ -20,6 +20,7 @@ public class QuestionnaireEntity : BaseTableEntity
     public string? Lang { get; set; }
     public string? Keywords { get; set; }
     public string? EmbeddingId { get; set; }
+    public bool IsFeedback { get; set; }
 
     public QuestionnaireEntity()
     {
@@ -40,6 +41,7 @@ public class QuestionnaireEntity : BaseTableEntity
         Name = questionnaire.Name;
         Lang = questionnaire.Lang;
         Keywords = string.Join(",", questionnaire.Keywords!);
+        IsFeedback = questionnaire.IsFeedback;
     }
 
     public async Task<Questionnaire> ToModelAsync(BlobContainerClient client)
@@ -50,7 +52,8 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-            Content = await GetFromBlob(client)
+            Content = await GetFromBlob(client),
+            IsFeedback = IsFeedback
         };
 
         if (Guid.TryParse(RowKey, out var id))

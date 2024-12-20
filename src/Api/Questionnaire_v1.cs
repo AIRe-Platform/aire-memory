@@ -21,6 +21,7 @@ using Aire.Sdk.Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
+using Newtonsoft.Json;
 
 namespace Aire.Memory.Api;
 
@@ -251,6 +252,70 @@ public class Questionnaire_v1
         return new ObjectResult(model);
     }
 
+    [Function("QueryFeedbackQuestionnaire_v1")]
+    [OpenApiOperation(
+        operationId: "queryFeedbackQuestionnaire",
+        tags: ["Questionnaires"],
+        Summary = "Query feedback questionnaires"
+    )]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "A questionnaire", Required = true)]
+    [OpenApiParameter("lang",
+        In = ParameterLocation.Query,
+        Required = false,
+        Description = "Set to return feedback questionnaires in a specific language")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Feedback questionnaire")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid parameters")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> QueryFeedbackQuestionnaire(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/feedback-questionnaire")] HttpRequest req,
+        FunctionContext context,
+        [FromQuery] string? lang = null)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+            return new ForbiddenResult();
+
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        // Retrieve all feedback questionnaires matching the IsFeedback = true condition
+        var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
+
+        //filter by language
+        var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
+    
+        //if not in seleected language, then English
+        if (feedbackQuestionnaire == null)
+        {
+            feedbackQuestionnaire = await feedbackQuestionnaires
+                .Where(q => q.Lang == "en")
+                .FirstOrDefaultAsync();
+        }
+
+        if (feedbackQuestionnaire == null)
+            return new NotFoundResult();
+
+        // Map the questionnaire entity to the model
+        var model = await feedbackQuestionnaire.ToModelAsync(_questionnaires);
+
+        return new ObjectResult(model);
+    }
+
 
     [Function("PostQuestionnaire_v1")]
     [OpenApiOperation(
@@ -272,6 +337,7 @@ public class Questionnaire_v1
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
         FunctionContext context)
     {
+        
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
             return new UnauthorizedResult();
@@ -282,6 +348,9 @@ public class Questionnaire_v1
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
+        
+        Console.WriteLine("Received Questionnaire:");
+        Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
         var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
         if (aiService == null)
@@ -291,6 +360,8 @@ public class Questionnaire_v1
         }
 
         questionnaire.Id = Guid.NewGuid();
+
+        
         var entity = new QuestionnaireEntity(questionnaire);
 
         {
@@ -400,6 +471,8 @@ public class Questionnaire_v1
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
 
+        entity.IsFeedback = questionnaire.IsFeedback;
+
         // Update embedding
 
         if (entity.EmbeddingId != null)
@@ -500,5 +573,50 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
 
         return new NoContentResult();
+    }
+
+    [Function("QueryFeedbackLanguages_v1")]
+    [OpenApiOperation(
+        operationId: "queryFeedbackLanguages",
+        tags: ["Questionnaires"],
+        Summary = "Query languages that already have feedback questionnaires"
+    )]
+    [OpenApiSecurity(
+        schemeName: "bearer_auth",
+        schemeType: SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<string>), Description = "List of languages with feedback questionnaires")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> QueryFeedbackLanguages(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/feedback-languages")] HttpRequest req,
+        FunctionContext context)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+            return new ForbiddenResult();
+
+        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        if (aiService == null)
+        {
+            _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        // Retrieve all feedback questionnaires
+        var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
+
+        // Get a list of distinct languages for the feedback questionnaires
+        var feedbackLanguages = await feedbackQuestionnaires
+            .Select(q => q.Lang)
+            .Distinct()
+            .ToListAsync();
+
+        return new ObjectResult(feedbackLanguages);
     }
 }
