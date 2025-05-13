@@ -1,3 +1,3 @@
 [submodule "submodules/aire-dotnet-sdk"]
 	path = submodules/aire-dotnet-sdk
-	url = git@github.com:GoodLife-Technology/aire-dotnet-sdk.git
+	url = git@github.com:AIRe-Platform/aire-dotnet-sdk.git
