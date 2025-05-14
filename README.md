@@ -1,20 +1,3 @@
-## TODO: Refactor this document to have an structure like this:
-## Table of Contents
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Usage](#usage)
-4. [Configuration](#configuration)
-5. [Contributing](#contributing)
-6. [API Reference](#api-reference)
-7. [Testing](#testing)
-8. [Deployment](#deployment)
-9. [Roadmap](#roadmap)
-10. [FAQ](#faq)
-11. [Troubleshooting](#troubleshooting)
-12. [License](#license)
-13. [Acknowledgments](#acknowledgments)
-14. [Contact](#contact)
-
 # AIRe Memory
 
 This module handles storing the data that the AIRe platform manages.
@@ -72,7 +55,3 @@ Publish the Fuctions app and then setup the following required environment value
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.
 - `TOKEN_ENCRYPTION_KEY` The token encryption key shared between the platform instance modules.
 - `StorageConnectionString` Azure Table Storage connection string
-
-## Disclaimer
-
-This README is a work-in-progress. The information above may be out-dated or incorrect.
