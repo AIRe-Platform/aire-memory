@@ -131,7 +131,7 @@ public class Content_v1
 
         if (model.Type.IsBlobType())
         {
-            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+            model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
         }
 
         // Use the helper method to get the thumbnail URL
@@ -207,7 +207,7 @@ public class Content_v1
             var model = entity.ToModel();
             if (model.Type != ContentType.URL)
             {
-                model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+                model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
             }
                         
             list.Add(model);
@@ -332,7 +332,7 @@ public class Content_v1
             return new InternalServerErrorResult();
 
         if (model.Type != ContentType.URL)
-            model.Url = SasHelper.GenerateContentUriString(_blobs, entity.Id());
+            model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
 
         return new OkObjectResult(model);
     }
