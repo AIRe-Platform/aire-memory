@@ -21,6 +21,7 @@ public class KeywordValueEntity : BaseTableEntity
     public int QuestionnaireCount { get; set; }
     public string? Translations { get; set; }
     public string? Prompt { get; set; }
+    public string? Document { get; set; }
 
     [IgnoreDataMember]
     public Dictionary<string, dynamic>? Stats
@@ -61,6 +62,7 @@ public class KeywordValueEntity : BaseTableEntity
         Stats = [];
         Translations = null;
         Prompt = null;
+        Document = null;
     }
 
     public KeywordValueEntity(Keyword keyword)
@@ -70,6 +72,7 @@ public class KeywordValueEntity : BaseTableEntity
         Stats = [];
         Translations = keyword.Translations.ObjectToJson();
         Prompt = keyword.Prompt;
+        Document = keyword.Document;
     }
 
     public Keyword ToModel()
@@ -80,6 +83,7 @@ public class KeywordValueEntity : BaseTableEntity
             Stats = Stats,
             Translations = Translations?.JsonToObject<List<Translation>>(),
             Prompt = Prompt,
+            Document = Document
         };
     }
 }

@@ -22,7 +22,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
-using System.Net.Http.Formatting;
 
 namespace Aire.Memory.Api;
 
