@@ -172,19 +172,10 @@ public class Document_v1
             return new InternalServerErrorResult();
         }
 
-        // Create entity and store blob if present
+        // Create entity
         var file = req.Form.Files[0];
         var entity = new DocumentEntity(metadata);
         entity.FileName ??= file.FileName;
-        {
-            using var stream = file.OpenReadStream();
-            var blobClient = _blobs.GetBlobClient(entity.Id());
-            var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
-            await blobClient.UploadAsync(stream, new BlobUploadOptions
-            {
-                HttpHeaders = blobHttpHeader
-            });
-        }
 
         // Create embedding
         var model = entity.ToModel();
@@ -199,7 +190,18 @@ public class Document_v1
             entity.EmbeddingId = embedId;
         }
 
-        // Insert content entity
+        // Store blob
+        {
+            using var stream = file.OpenReadStream();
+            var blobClient = _blobs.GetBlobClient(entity.Id());
+            var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
+            await blobClient.UploadAsync(stream, new BlobUploadOptions
+            {
+                HttpHeaders = blobHttpHeader
+            });
+        }
+
+        // Insert entity
         var result = await _storage.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
