@@ -19,6 +19,7 @@ public static class AireConstants
         public const string QuestionnaireResults = "questionnaire-results";
         public const string Contents = "contents";
         public const string Reminders = "reminders";
+        public const string Documents = "documents";
     }
 
     public static class Tables

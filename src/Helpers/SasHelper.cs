@@ -10,7 +10,7 @@ namespace Aire.Memory.Helpers;
 
 public static class SasHelper
 {
-    public static string GenerateContentUriString(BlobContainerClient container, string blobId)
+    public static string GenerateSasUriString(BlobContainerClient container, string blobId)
     {
         var blobSasBuilder = new BlobSasBuilder()
         {
