@@ -16,7 +16,7 @@ public static class BlobHelper
         var thumbnailExists = await thumbnailBlobClient.ExistsAsync();
         if (thumbnailExists)
         {
-            return SasHelper.GenerateContentUriString(blobContainer, $"{contentId}/thumbnail");
+            return SasHelper.GenerateSasUriString(blobContainer, $"{contentId}/thumbnail");
         }
         return "";
     }
