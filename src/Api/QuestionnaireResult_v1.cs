@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
@@ -27,16 +26,14 @@ public class QuestionnaireResults_v1
     private readonly BlobContainerClient _blobs;
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
 
-    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt, ILogger<QuestionnaireResults_v1> log)
+    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.QuestionnaireResults);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = storage;
         _jwt = jwt;
-        _log = log;
     }
 
     [Function("GetQuestionnaireResults_v1")]
@@ -83,13 +80,8 @@ public class QuestionnaireResults_v1
     }
 
     [Function("PostQuestionnaireResults_v1")]
-    [OpenApiOperation(
-        operationId: "postQuestionnaireResults",
-        tags: ["Questionnaire Results"],
-        Summary = "Store new questionnaire results")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postQuestionnaireResults", ["Questionnaire Results"], Summary = "Store new questionnaire results")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -130,13 +122,8 @@ public class QuestionnaireResults_v1
     }
 
     [Function("DeleteQuestionnaireResults_v1")]
-    [OpenApiOperation(
-        operationId: "deleteQuestionnaireResults",
-        tags: ["Questionnaire Results"],
-        Summary = "Retrieve questionnaire results")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteQuestionnaireResults", ["Questionnaire Results"], Summary = "Retrieve questionnaire results")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]

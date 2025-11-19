@@ -50,13 +50,8 @@ public class Questionnaire_v1
     }
 
     [Function("GetQuestionnaires_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnaires",
-        tags: ["Questionnaires"],
-        Summary = "Get a list of questionnaires")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnaires", ["Questionnaires"], Summary = "Get a list of questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -82,14 +77,8 @@ public class Questionnaire_v1
     }
 
     [Function("GetQuestionnairesWithKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnairesWithKeyword",
-        tags: ["Questionnaires"],
-        Summary = "Get questionnaires with keyword"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnairesWithKeyword", ["Questionnaires"], Summary = "Get questionnaires with keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -140,13 +129,8 @@ public class Questionnaire_v1
     }
 
     [Function("GetQuestionnaireWithId_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnaireWithId",
-        tags: ["Questionnaires"],
-        Summary = "Retrieve a questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnaireWithId", ["Questionnaires"], Summary = "Retrieve a questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -180,14 +164,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "queryQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Query questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryQuestionnaire", ["Questionnaires"], Summary = "Query questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -216,7 +194,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(query))
@@ -253,14 +231,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryFeedbackQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "queryFeedbackQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Query feedback questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryFeedbackQuestionnaire", ["Questionnaires"], Summary = "Query feedback questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -283,7 +255,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
@@ -298,7 +270,7 @@ public class Questionnaire_v1
 
         //filter by language
         var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
-    
+
         //if not in seleected language, then English
         if (feedbackQuestionnaire == null)
         {
@@ -318,13 +290,8 @@ public class Questionnaire_v1
 
 
     [Function("PostQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "postQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Store new questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postQuestionnaire", ["Questionnaires"], Summary = "Store new questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -337,18 +304,18 @@ public class Questionnaire_v1
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
         FunctionContext context)
     {
-        
+
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
-        
+
         Console.WriteLine("Received Questionnaire:");
         Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
@@ -361,16 +328,15 @@ public class Questionnaire_v1
 
         questionnaire.Id = Guid.NewGuid();
 
-        
         var entity = new QuestionnaireEntity(questionnaire);
 
         {
-           var words = await KeywordHelper.UpdateKeywords(
-                _tables,
-                ResourceTypes.Questionnaire,
-                entity.Id(),
-                [],
-                questionnaire.Keywords ?? []);
+            var words = await KeywordHelper.UpdateKeywords(
+                 _tables,
+                 ResourceTypes.Questionnaire,
+                 entity.Id(),
+                 [],
+                 questionnaire.Keywords ?? []);
 
             entity.Keywords = string.Join(",", words);
         }
@@ -400,16 +366,11 @@ public class Questionnaire_v1
 
 
     [Function("PutQuestionnaire_v1")]
-    [OpenApiOperation(
-            operationId: "putQuestionnaire",
-            tags: ["Questionnaires"],
-            Summary = "Edit existing questionnaire")]
-    [OpenApiSecurity(
-            schemeName: "bearer_auth",
-            schemeType: SecuritySchemeType.Http,
-            Scheme = OpenApiSecuritySchemeType.Bearer,
-            BearerFormat = "JWT",
-            Description = "User token")]
+    [OpenApiOperation("putQuestionnaire", ["Questionnaires"], Summary = "Edit existing questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
     [OpenApiParameter("id", Description = "Questionnaire identifier", Required = true)]
     [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "Questionnaire", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Questionnaire")]
@@ -425,7 +386,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
@@ -435,7 +396,7 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
@@ -505,13 +466,8 @@ public class Questionnaire_v1
 
 
     [Function("DeleteQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "deleteQuestionnaireWithId",
-        tags: ["Questionnaires"],
-        Summary = "Delete a questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteQuestionnaireWithId", ["Questionnaires"], Summary = "Delete a questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -530,7 +486,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
@@ -576,14 +532,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryFeedbackLanguages_v1")]
-    [OpenApiOperation(
-        operationId: "queryFeedbackLanguages",
-        tags: ["Questionnaires"],
-        Summary = "Query languages that already have feedback questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryFeedbackLanguages", ["Questionnaires"], Summary = "Query languages that already have feedback questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -600,13 +550,6 @@ public class Questionnaire_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
-
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
 
         // Retrieve all feedback questionnaires
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);

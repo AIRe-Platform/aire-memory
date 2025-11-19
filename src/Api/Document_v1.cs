@@ -50,13 +50,8 @@ public class Document_v1
     }
 
     [Function("GetDocuments_v1")]
-    [OpenApiOperation(
-        operationId: "getDocuments",
-        tags: ["Documents"],
-        Summary = "Get a list of documents")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getDocuments", ["Documents"], Summary = "Get a list of documents")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -80,13 +75,8 @@ public class Document_v1
     }
 
     [Function("GetDocumentWithId_v1")]
-    [OpenApiOperation(
-        operationId: "getDocumentWithId",
-        tags: ["Documents"],
-        Summary = "Retrieve a document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getDocumentWithId", ["Documents"], Summary = "Retrieve a document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -128,13 +118,8 @@ public class Document_v1
     }
 
     [Function("PostDocument_v1")]
-    [OpenApiOperation(
-        operationId: "postDocument",
-        tags: ["Documents"],
-        Summary = "Store new document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postDocument", ["Documents"], Summary = "Store new document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -151,7 +136,7 @@ public class Document_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument) || auth.Platform == null)
             return new ForbiddenResult();
 
         var formData = await req.ReadFormAsync();
@@ -210,13 +195,8 @@ public class Document_v1
     }
 
     [Function("DeleteDocument_v1")]
-    [OpenApiOperation(
-        operationId: "deleteDocument",
-        tags: ["Documents"],
-        Summary = "Delete document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteDocument", ["Documents"], Summary = "Delete document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]

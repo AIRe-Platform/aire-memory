@@ -22,27 +22,15 @@ using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
-public class Keyword_v1
+public class Keyword_v1(ITableStorageService tables, IJwtTokenService jwt, ILogger<Keyword_v1> log)
 {
-    private readonly ITableStorageService _tables;
-    private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
-
-    public Keyword_v1(ITableStorageService tables, IJwtTokenService jwt, ILogger<Keyword_v1> log)
-    {
-        _tables = tables;
-        _jwt = jwt;
-        _log = log;
-    }
+    private readonly ITableStorageService _tables = tables;
+    private readonly IJwtTokenService _jwt = jwt;
+    private readonly ILogger _log = log;
 
     [Function("QueryKeywords_v1")]
-    [OpenApiOperation(
-        operationId: "queryKeywords",
-        tags: ["Keywords"],
-        Summary = "Query keywords")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryKeywords", ["Keywords"], Summary = "Query keywords")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -63,7 +51,7 @@ public class Keyword_v1
 
         var query = await _tables.All<KeywordValueEntity>();
         var results = query.Where(x => x.RowKey!.Contains(search));
-        
+
         var list = results.Select(x =>
         {
             var model = x.ToModel();
@@ -76,13 +64,8 @@ public class Keyword_v1
     }
 
     [Function("GetKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "getKeyword",
-        tags: ["Keywords"],
-        Summary = "Get keyword stats")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getKeyword", ["Keywords"], Summary = "Get keyword stats")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -117,13 +100,8 @@ public class Keyword_v1
     }
 
     [Function("CreateKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "createKeyword",
-        tags: ["Keywords"],
-        Summary = "Create a keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("createKeyword", ["Keywords"], Summary = "Create a keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -145,7 +123,7 @@ public class Keyword_v1
             return new ForbiddenResult();
 
         var body = await req.ReadJson<KeywordCreateRequest>();
-        if(body == null)
+        if (body == null)
             return new BadRequestResult();
 
         string keyword = KeywordHelper.Sanitize(body.Value);
@@ -166,13 +144,8 @@ public class Keyword_v1
     }
 
     [Function("DeleteKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "deleteKeyword",
-        tags: ["Keywords"],
-        Summary = "Delete an unused keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteKeyword", ["Keywords"], Summary = "Delete an unused keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -212,13 +185,8 @@ public class Keyword_v1
     }
 
     [Function("EditKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "EditKeyword",
-        tags: ["Keywords"],
-        Summary = "Edit a keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("EditKeyword", ["Keywords"], Summary = "Edit a keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -239,13 +207,13 @@ public class Keyword_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
             return new ForbiddenResult();
-        
+
         var pk = KeywordValueEntity.PartitionFromValue(keyword);
         if (pk == null)
             return new BadRequestResult();
-        
+
         var body = await req.ReadJson<Keyword>();
-        if(body == null)
+        if (body == null)
             return new BadRequestResult();
 
         var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
