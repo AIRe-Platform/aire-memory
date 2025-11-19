@@ -22,6 +22,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Newtonsoft.Json;
+using Aire.Memory.Services;
+using Aire.Sdk.Models.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -31,6 +33,7 @@ public class Questionnaire_v1
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
     private readonly IAireClientFactory _clientFactory;
+    private readonly ModuleConfigService _moduleConfigService;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
@@ -38,6 +41,7 @@ public class Questionnaire_v1
         ITableStorageService tables,
         IJwtTokenService jwt,
         IAireClientFactory clientFactory,
+        ModuleConfigService moduleConfigService,
         ILogger<Questionnaire_v1> log)
     {
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
@@ -46,6 +50,7 @@ public class Questionnaire_v1
         _tables = tables;
         _jwt = jwt;
         _clientFactory = clientFactory;
+        _moduleConfigService = moduleConfigService;
         _log = log;
     }
 
@@ -200,7 +205,14 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(query))
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing vector_database_name module configuration");
+            return new InternalServerErrorResult();
+        }
+
+        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
@@ -208,7 +220,7 @@ public class Questionnaire_v1
         }
 
         var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var queryResponse = await aiService.QueryQuestionnaires(queryWords);
+        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords);
 
         if (queryResponse == null || queryResponse.Results == null)
             return new NotFoundResult();
@@ -258,7 +270,7 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth!.JwtEncodedToken, null);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
@@ -319,10 +331,17 @@ public class Questionnaire_v1
         Console.WriteLine("Received Questionnaire:");
         Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing vector_database_name module configuration");
             return new InternalServerErrorResult();
         }
 
@@ -342,7 +361,7 @@ public class Questionnaire_v1
         }
 
         {
-            var embedResult = await aiService.CreateQuestionnaireEmbedding(questionnaire);
+            var embedResult = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -403,6 +422,13 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
         }
 
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing vector_database_name module configuration");
+            return new InternalServerErrorResult();
+        }
+
         var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
@@ -438,7 +464,7 @@ public class Questionnaire_v1
 
         if (entity.EmbeddingId != null)
         {
-            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
+            bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");
@@ -446,7 +472,7 @@ public class Questionnaire_v1
             }
         }
 
-        var embed = await aiService.CreateQuestionnaireEmbedding(questionnaire);
+        var embed = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
         var embedId = embed?.Ids?.FirstOrDefault();
         if (embedId == null)
         {
@@ -507,14 +533,21 @@ public class Questionnaire_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
+            var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
             if (aiService == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
-            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
+            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            if (aiDatabase == null)
+            {
+                _log.LogCritical("Missing vector_database_name module configuration");
+                return new InternalServerErrorResult();
+            }
+
+            bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");

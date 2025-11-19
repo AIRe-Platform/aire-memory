@@ -25,6 +25,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AzureWebJobsStorage": "",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+        "AIRE_MODULE_ID": "aire.memory.development",
         "AIRE_SERVICE_BASE": "http://localhost:7071/api/",
         "AIRE_SERVICE_KEY": "<service key secret>",
         "TOKEN_ENCRYPTION_KEY": "<enryption key shared between platform modules>",
@@ -50,6 +51,7 @@ You can set a custom host with `OpenApi__HostNames` environment value.
 
 Publish the Fuctions app and then setup the following required environment values:
 
+- `AIRE_MODULE_ID` The identifier of the module as it is configured in the platform.
 - `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
 - `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.

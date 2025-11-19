@@ -22,6 +22,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
+using Aire.Memory.Services;
+using Aire.Sdk.Models.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -31,6 +33,7 @@ public class Document_v1
     private readonly IJwtTokenService _jwt;
     private readonly BlobContainerClient _blobs;
     private readonly IAireClientFactory _clientFactory;
+    private readonly ModuleConfigService _moduleConfigService;
     private readonly ILogger _log;
 
     public Document_v1(
@@ -38,6 +41,7 @@ public class Document_v1
         ITableStorageService storage,
         IJwtTokenService jwt,
         IAireClientFactory clientFactory,
+        ModuleConfigService moduleConfigService,
         ILogger<Content_v1> log)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Documents);
@@ -46,6 +50,7 @@ public class Document_v1
         _storage = storage;
         _jwt = jwt;
         _clientFactory = clientFactory;
+        _moduleConfigService = moduleConfigService;
         _log = log;
     }
 
@@ -149,10 +154,17 @@ public class Document_v1
         if (metadata == null || metadata.Source.HasValue || req.Form.Files.Count != 1)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
         if (aiService == null)
         {
             _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing vector_database_name module configuration");
             return new InternalServerErrorResult();
         }
 
@@ -164,7 +176,7 @@ public class Document_v1
         // Create embedding
         var model = entity.ToModel();
         {
-            var embedResult = await aiService.CreateDocumentEmbedding(file, model);
+            var embedResult = await aiService.CreateDocumentEmbedding(aiDatabase, file, model);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -215,7 +227,7 @@ public class Document_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteDocument))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteDocument) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (!Guid.TryParse(id, out Guid _))
@@ -229,14 +241,21 @@ public class Document_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
+            var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
             if (aiService == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
-            bool result = await aiService.DeleteDocumentEmbedding(entity.EmbeddingId);
+            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            if (aiDatabase == null)
+            {
+                _log.LogCritical("Missing vector_database_name module configuration");
+                return new InternalServerErrorResult();
+            }
+
+            bool result = await aiService.DeleteDocumentEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete content embedding");

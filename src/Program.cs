@@ -20,6 +20,7 @@ using Aire.Sdk.Platform;
 using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Queues;
 using Aire.Sdk.Azure;
+using Aire.Memory.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -96,6 +97,12 @@ var host = new HostBuilder()
             .AddSingleton<IAirePlatformService, AirePlatformService>()
             .AddScoped<IAireClientFactory, AireClientFactory>();
 
+        services
+            .Configure<ModuleConfig>(o =>
+            {
+                o.ModuleIdentifier = AireEnvironment.ModuleIdentifier;
+            })
+            .AddSingleton<ModuleConfigService>();
     })
     .Build();
 
