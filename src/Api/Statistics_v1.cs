@@ -65,15 +65,16 @@ public class Statistics_v1
 
         var filter = StatisticsEntity.CreateFilter(from.Value, to, eventNamePrefix);
         var query = await _storage.QueryAsync<StatisticsEntity>(filter);
-        var resultsByEventName = query.Select(x => x.ToModel()).GroupBy(x => x.EventName);
+        var queryResults = await query.ToListAsync();
+        var resultsByEventName = queryResults.Select(x => x.ToModel()).GroupBy(x => x.EventName);
 
         var results = new List<StatisticsEventInfo>();
-        await foreach (var g in resultsByEventName)
+        foreach (var g in resultsByEventName)
         {
             var info = new StatisticsEventInfo()
             {
                 EventName = g.Key,
-                EventCount = await g.SumAsync(x => x.EventCount)
+                EventCount = g.Sum(x => x.EventCount)
             };
             results.Add(info);
         }

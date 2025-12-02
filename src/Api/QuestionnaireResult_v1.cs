@@ -71,9 +71,9 @@ public class QuestionnaireResults_v1
             .QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == auth.UserId && x.QuestionnaireId == id);
 
         var results = await query.ToListAsync();
-        var asyncList = results.ToAsyncEnumerable();
-        var list = await asyncList
-            .SelectAwait(async x => await x.ToModelAsync(_blobs, auth.UserKey))
+        var list = await results
+            .ToAsyncEnumerable()
+            .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.ToModelAsync(_blobs, auth.UserKey))
             .ToListAsync();
 
         return new OkObjectResult(list);

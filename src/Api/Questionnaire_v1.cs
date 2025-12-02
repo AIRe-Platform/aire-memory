@@ -75,8 +75,10 @@ public class Questionnaire_v1
             return new ForbiddenResult();
 
         var all = await _tables.All<QuestionnaireEntity>();
-        var models = all.Select(x => x.ToModelAsync(_questionnaires)).ToAsyncEnumerable();
-        var list = await models.SelectAwait(async x => await x).ToListAsync();
+        var list = await all
+            .ToAsyncEnumerable()
+            .Select(async (QuestionnaireEntity x, CancellationToken ct) => await x.ToModelAsync(_questionnaires))
+            .ToListAsync();
 
         return new ObjectResult(list);
     }

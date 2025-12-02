@@ -96,7 +96,7 @@ public class UserData_v1
         var questionnaire_entries = await _storage.Partition<QuestionnaireResultsEntity>(auth.UserId);
         var questionnaires = await questionnaire_entries
             .ToAsyncEnumerable()
-            .SelectAwait(async x => await x.GetFromBlob(_questionnaires, auth.UserKey))
+            .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.GetFromBlob(_questionnaires, auth.UserKey))
             .Where(x => x != null)
             .ToListAsync();
 
