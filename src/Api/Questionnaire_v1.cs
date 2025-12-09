@@ -24,6 +24,7 @@ using Aire.Memory.Helpers;
 using Newtonsoft.Json;
 using Aire.Memory.Services;
 using Aire.Sdk.Models.Platform;
+using Aire.Sdk.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -32,6 +33,7 @@ public class Questionnaire_v1
     private readonly BlobContainerClient _questionnaires;
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
+    private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
     private readonly ModuleConfigService _moduleConfigService;
     private readonly ILogger _log;
@@ -40,6 +42,7 @@ public class Questionnaire_v1
         BlobServiceClient blobs,
         ITableStorageService tables,
         IJwtTokenService jwt,
+        IAirePlatformService platformService,
         IAireClientFactory clientFactory,
         ModuleConfigService moduleConfigService,
         ILogger<Questionnaire_v1> log)
@@ -49,6 +52,7 @@ public class Questionnaire_v1
 
         _tables = tables;
         _jwt = jwt;
+        _platform = platformService;
         _clientFactory = clientFactory;
         _moduleConfigService = moduleConfigService;
         _log = log;
@@ -207,17 +211,18 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(query))
             return new BadRequestResult();
 
-        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
-        if (aiDatabase == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
-            _log.LogCritical("Missing vector_database_name module configuration");
+            _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
         {
-            _log.LogCritical("Default AI module not configured");
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -272,12 +277,14 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth!.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
+
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth!.JwtEncodedToken);
 
         // Retrieve all feedback questionnaires matching the IsFeedback = true condition
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
@@ -333,17 +340,18 @@ public class Questionnaire_v1
         Console.WriteLine("Received Questionnaire:");
         Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
-            _log.LogCritical("Missing vector_database_name module configuration");
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -417,17 +425,18 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
-            _log.LogCritical("Missing vector_database_name module configuration");
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -535,17 +544,18 @@ public class Questionnaire_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-            if (aiService == null)
+            var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+            if (aiModule == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
+            var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
             var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
             if (aiDatabase == null)
             {
-                _log.LogCritical("Missing vector_database_name module configuration");
+                _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
                 return new InternalServerErrorResult();
             }
 

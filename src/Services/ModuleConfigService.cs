@@ -21,7 +21,7 @@ public class ModuleConfigService(IAirePlatformService platformService, IOptions<
         var selfId = options.Value.ModuleIdentifier
             ?? throw new Exception("Invalid module config");
 
-        var module = await platformService.GetServiceModule(platform, ModuleType.Memory, selfId);
+        var module = await platformService.GetPlatformModule(platform, ModuleType.Memory, selfId);
         if (module?.Settings == null)
             return default;
 

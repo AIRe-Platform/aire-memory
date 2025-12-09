@@ -24,6 +24,7 @@ using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
 using Aire.Memory.Services;
 using Aire.Sdk.Models.Platform;
+using Aire.Sdk.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -32,6 +33,7 @@ public class Content_v1
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly BlobContainerClient _blobs;
+    private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
     private readonly ModuleConfigService _moduleConfigService;
     private readonly ILogger _log;
@@ -40,6 +42,7 @@ public class Content_v1
         BlobServiceClient blobs,
         ITableStorageService storage,
         IJwtTokenService jwt,
+        IAirePlatformService platformService,
         IAireClientFactory clientFactory,
         ModuleConfigService moduleConfigService,
         ILogger<Content_v1> log)
@@ -49,6 +52,7 @@ public class Content_v1
 
         _storage = storage;
         _jwt = jwt;
+        _platform = platformService;
         _clientFactory = clientFactory;
         _moduleConfigService = moduleConfigService;
         _log = log;
@@ -237,17 +241,18 @@ public class Content_v1
         if (content == null || content.Id.HasValue || !content.Type.HasValue)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
-            _log.LogCritical("Missing vector_database_name module configuration");
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -357,17 +362,18 @@ public class Content_v1
         if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
-            _log.LogCritical("Missing vector_database_name module configuration");
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -538,17 +544,18 @@ public class Content_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.Platform, auth.JwtEncodedToken, null);
-            if (aiService == null)
+            var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+            if (aiModule == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
+            var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
             var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
             if (aiDatabase == null)
             {
-                _log.LogCritical("Missing vector_database_name module configuration");
+                _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
                 return new InternalServerErrorResult();
             }
 
