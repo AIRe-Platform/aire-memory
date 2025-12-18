@@ -20,7 +20,6 @@ using Aire.Sdk.Platform;
 using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Queues;
 using Aire.Sdk.Azure;
-using Aire.Memory.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -45,20 +44,20 @@ var host = new HostBuilder()
 
         services.AddAzureClients(builder =>
         {
-            builder.AddTableServiceClient(AireEnvironment.StorageConnectionString)
+            builder.AddTableServiceClient(AireMemoryEnvironment.StorageConnectionString)
                 .ConfigureOptions(options =>
                 {
                     options.Diagnostics.IsLoggingEnabled = false;
                 });
 
-            builder.AddQueueServiceClient(AireEnvironment.StorageConnectionString)
+            builder.AddQueueServiceClient(AireMemoryEnvironment.StorageConnectionString)
                 .ConfigureOptions(options =>
                 {
                     options.MessageEncoding = QueueMessageEncoding.Base64;
                     options.Diagnostics.IsLoggingEnabled = false;
                 });
 
-            builder.AddBlobServiceClient(AireEnvironment.StorageConnectionString)
+            builder.AddBlobServiceClient(AireMemoryEnvironment.StorageConnectionString)
                 .ConfigureOptions(options =>
                 {
                     options.Diagnostics.IsLoggingEnabled = false;
@@ -78,7 +77,7 @@ var host = new HostBuilder()
                     Description = "This is the reference implementation of the AIRe Platform Memory module."
                 },
                 Servers = [
-                    new OpenApiServer { Url = AireEnvironment.OpenApiHost ?? "/api" }
+                    new OpenApiServer { Url = AireMemoryEnvironment.OpenApiHost ?? "/api" }
                 ],
                 OpenApiVersion = OpenApiVersionType.V3,
                 IncludeRequestingHostName = false,
@@ -98,11 +97,12 @@ var host = new HostBuilder()
             .AddScoped<IAireClientFactory, AireClientFactory>();
 
         services
-            .Configure<ModuleConfig>(o =>
+            .Configure<AireModuleConfig>(o =>
             {
-                o.ModuleIdentifier = AireEnvironment.ModuleIdentifier;
+                o.Type = Aire.Sdk.Models.Platform.ModuleType.Memory;
+                o.Identifier = AireEnvironment.ModuleIdentifier;
             })
-            .AddSingleton<ModuleConfigService>();
+            .AddSingleton<IAireModuleSettingsService, AireModuleSettingsService>();
     })
     .Build();
 

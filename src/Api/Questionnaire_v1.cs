@@ -22,7 +22,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Newtonsoft.Json;
-using Aire.Memory.Services;
 using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 
@@ -35,7 +34,7 @@ public class Questionnaire_v1
     private readonly IJwtTokenService _jwt;
     private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
-    private readonly ModuleConfigService _moduleConfigService;
+    private readonly IAireModuleSettingsService _moduleConfigService;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
@@ -44,7 +43,7 @@ public class Questionnaire_v1
         IJwtTokenService jwt,
         IAirePlatformService platformService,
         IAireClientFactory clientFactory,
-        ModuleConfigService moduleConfigService,
+        IAireModuleSettingsService moduleConfigService,
         ILogger<Questionnaire_v1> log)
     {
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);

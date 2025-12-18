@@ -22,7 +22,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
-using Aire.Memory.Services;
 using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 
@@ -35,7 +34,7 @@ public class Document_v1
     private readonly BlobContainerClient _blobs;
     private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
-    private readonly ModuleConfigService _moduleConfigService;
+    private readonly IAireModuleSettingsService _moduleConfigService;
     private readonly ILogger _log;
 
     public Document_v1(
@@ -44,7 +43,7 @@ public class Document_v1
         IJwtTokenService jwt,
         IAirePlatformService platformService,
         IAireClientFactory clientFactory,
-        ModuleConfigService moduleConfigService,
+        IAireModuleSettingsService moduleConfigService,
         ILogger<Content_v1> log)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Documents);
