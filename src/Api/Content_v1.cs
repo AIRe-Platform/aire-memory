@@ -247,7 +247,7 @@ public class Content_v1
             return new InternalServerErrorResult();
         }
 
-        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
@@ -368,7 +368,7 @@ public class Content_v1
             return new InternalServerErrorResult();
         }
 
-        var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
         var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
         if (aiDatabase == null)
         {
@@ -550,7 +550,7 @@ public class Content_v1
                 return new InternalServerErrorResult();
             }
 
-            var aiService = await _clientFactory.CreateAiClient(aiModule, auth.JwtEncodedToken);
+            var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
             var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
             if (aiDatabase == null)
             {
