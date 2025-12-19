@@ -225,14 +225,14 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
         }
 
+        int relevance = await _moduleConfigService.Get<int>(auth.Platform, ModuleSettings.Memory_VectorSearchRelevanceThreshold);
         var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords);
+        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords, relevance / 100.0f);
 
         if (queryResponse == null || queryResponse.Results == null)
             return new NotFoundResult();
 
         var questionnaireId = queryResponse.Results
-            .Where(x => x.Relevance.HasValue && x.Relevance.Value > 0.7)
             .Where(x => string.IsNullOrEmpty(lang) || lang == x.Language)
             .Select(x => x.Id)
             .FirstOrDefault();
@@ -275,15 +275,6 @@ public class Questionnaire_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
-
-        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
-        if (aiModule == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
-
-        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
 
         // Retrieve all feedback questionnaires matching the IsFeedback = true condition
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
