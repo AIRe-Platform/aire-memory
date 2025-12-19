@@ -98,13 +98,18 @@ public class Questionnaire_v1
         typeof(List<Questionnaire>),
         Description = "List of questionnaires containing querried keyword")]
     [OpenApiParameter("keyword", Description = "Keyword to query", In = ParameterLocation.Path, Required = true)]
+    [OpenApiParameter("lang",
+        In = ParameterLocation.Query,
+        Required = false,
+        Description = "Set to return questionnaires in a specific language")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetQuestionnairesWithKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaires/{keyword}")] HttpRequest req,
         FunctionContext context,
-        string keyword)
+        string keyword,
+        [FromQuery] string? lang = null)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth is null)
@@ -129,7 +134,7 @@ public class Questionnaire_v1
                 continue;
 
             var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
-            if (entity is null)
+            if (entity is null || (lang != null && entity.Lang != lang))
                 continue;
 
             questionnaires.Add(await entity.ToModelAsync(_questionnaires));
