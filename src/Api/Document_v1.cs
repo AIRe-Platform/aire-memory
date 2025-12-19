@@ -22,6 +22,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
+using Aire.Sdk.Models.Platform;
+using Aire.Sdk.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -30,14 +32,18 @@ public class Document_v1
     private readonly ITableStorageService _storage;
     private readonly IJwtTokenService _jwt;
     private readonly BlobContainerClient _blobs;
+    private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
+    private readonly IAireModuleSettingsService _moduleConfigService;
     private readonly ILogger _log;
 
     public Document_v1(
         BlobServiceClient blobs,
         ITableStorageService storage,
         IJwtTokenService jwt,
+        IAirePlatformService platformService,
         IAireClientFactory clientFactory,
+        IAireModuleSettingsService moduleConfigService,
         ILogger<Content_v1> log)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Documents);
@@ -45,18 +51,15 @@ public class Document_v1
 
         _storage = storage;
         _jwt = jwt;
+        _platform = platformService;
         _clientFactory = clientFactory;
+        _moduleConfigService = moduleConfigService;
         _log = log;
     }
 
     [Function("GetDocuments_v1")]
-    [OpenApiOperation(
-        operationId: "getDocuments",
-        tags: ["Documents"],
-        Summary = "Get a list of documents")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getDocuments", ["Documents"], Summary = "Get a list of documents")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -80,13 +83,8 @@ public class Document_v1
     }
 
     [Function("GetDocumentWithId_v1")]
-    [OpenApiOperation(
-        operationId: "getDocumentWithId",
-        tags: ["Documents"],
-        Summary = "Retrieve a document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getDocumentWithId", ["Documents"], Summary = "Retrieve a document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -128,13 +126,8 @@ public class Document_v1
     }
 
     [Function("PostDocument_v1")]
-    [OpenApiOperation(
-        operationId: "postDocument",
-        tags: ["Documents"],
-        Summary = "Store new document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postDocument", ["Documents"], Summary = "Store new document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -151,7 +144,7 @@ public class Document_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument) || auth.Platform == null)
             return new ForbiddenResult();
 
         var formData = await req.ReadFormAsync();
@@ -164,10 +157,18 @@ public class Document_v1
         if (metadata == null || metadata.Source.HasValue || req.Form.Files.Count != 1)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -179,7 +180,7 @@ public class Document_v1
         // Create embedding
         var model = entity.ToModel();
         {
-            var embedResult = await aiService.CreateDocumentEmbedding(file, model);
+            var embedResult = await aiService.CreateDocumentEmbedding(aiDatabase, file, model);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -210,13 +211,8 @@ public class Document_v1
     }
 
     [Function("DeleteDocument_v1")]
-    [OpenApiOperation(
-        operationId: "deleteDocument",
-        tags: ["Documents"],
-        Summary = "Delete document")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteDocument", ["Documents"], Summary = "Delete document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -235,7 +231,7 @@ public class Document_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteDocument))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteDocument) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (!Guid.TryParse(id, out Guid _))
@@ -249,14 +245,22 @@ public class Document_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
-            if (aiService == null)
+            var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+            if (aiModule == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
-            bool result = await aiService.DeleteDocumentEmbedding(entity.EmbeddingId);
+            var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            if (aiDatabase == null)
+            {
+                _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
+                return new InternalServerErrorResult();
+            }
+
+            bool result = await aiService.DeleteDocumentEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete content embedding");

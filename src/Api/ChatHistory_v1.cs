@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
@@ -27,26 +26,19 @@ public class ChatHistory_v1
     private readonly BlobContainerClient _chatlogs;
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
 
-    public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILogger<ChatHistory_v1> log)
+    public ChatHistory_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt)
     {
         _chatlogs = blobs.GetBlobContainerClient(AireConstants.Blobs.ChatLogs);
         _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = tables;
         _jwt = jwt;
-        _log = log;
     }
 
     [Function("GetChatHistory_v1")]
-    [OpenApiOperation(
-        operationId: "getChatHistory",
-        tags: ["Chat History"],
-        Summary = "Get a list of chat logs")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getChatHistory", ["Chat History"], Summary = "Get a list of chat logs")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -77,13 +69,8 @@ public class ChatHistory_v1
     }
 
     [Function("GetChatHistoryWithId_v1")]
-    [OpenApiOperation(
-        operationId: "getChatHistoryWithId",
-        tags: ["Chat History"],
-        Summary = "Retrieve a chat log")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getChatHistoryWithId", ["Chat History"], Summary = "Retrieve a chat log")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -120,13 +107,8 @@ public class ChatHistory_v1
     }
 
     [Function("PostChatHistory_v1")]
-    [OpenApiOperation(
-        operationId: "postChatHistory",
-        tags: ["Chat History"],
-        Summary = "Store new chat log")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postChatHistory", ["Chat History"], Summary = "Store new chat log")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -166,13 +148,8 @@ public class ChatHistory_v1
     }
 
     [Function("PutChatHistory_v1")]
-    [OpenApiOperation(
-        operationId: "putChatHistory",
-        tags: ["Chat History"],
-        Summary = "Edit existing chat log")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("putChatHistory", ["Chat History"], Summary = "Edit existing chat log")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -222,13 +199,8 @@ public class ChatHistory_v1
     }
 
     [Function("DeleteChatHistory_v1")]
-    [OpenApiOperation(
-        operationId: "deleteChatHistory",
-        tags: ["Chat History"],
-        Summary = "Delete entire chat history")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteChatHistory", ["Chat History"], Summary = "Delete entire chat history")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -262,13 +234,8 @@ public class ChatHistory_v1
     }
 
     [Function("DeleteChatHistoryWithId_v1")]
-    [OpenApiOperation(
-        operationId: "deleteChatHistoryWithId",
-        tags: ["Chat History"],
-        Summary = "Delete a chat log")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteChatHistoryWithId", ["Chat History"], Summary = "Delete a chat log")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]

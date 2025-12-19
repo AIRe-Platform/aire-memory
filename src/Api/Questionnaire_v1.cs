@@ -22,6 +22,8 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Newtonsoft.Json;
+using Aire.Sdk.Models.Platform;
+using Aire.Sdk.Platform;
 
 namespace Aire.Memory.Api;
 
@@ -30,14 +32,18 @@ public class Questionnaire_v1
     private readonly BlobContainerClient _questionnaires;
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
+    private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
+    private readonly IAireModuleSettingsService _moduleConfigService;
     private readonly ILogger _log;
 
     public Questionnaire_v1(
         BlobServiceClient blobs,
         ITableStorageService tables,
         IJwtTokenService jwt,
+        IAirePlatformService platformService,
         IAireClientFactory clientFactory,
+        IAireModuleSettingsService moduleConfigService,
         ILogger<Questionnaire_v1> log)
     {
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
@@ -45,18 +51,15 @@ public class Questionnaire_v1
 
         _tables = tables;
         _jwt = jwt;
+        _platform = platformService;
         _clientFactory = clientFactory;
+        _moduleConfigService = moduleConfigService;
         _log = log;
     }
 
     [Function("GetQuestionnaires_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnaires",
-        tags: ["Questionnaires"],
-        Summary = "Get a list of questionnaires")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnaires", ["Questionnaires"], Summary = "Get a list of questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -75,21 +78,17 @@ public class Questionnaire_v1
             return new ForbiddenResult();
 
         var all = await _tables.All<QuestionnaireEntity>();
-        var models = all.Select(x => x.ToModelAsync(_questionnaires)).ToAsyncEnumerable();
-        var list = await models.SelectAwait(async x => await x).ToListAsync();
+        var list = await all
+            .ToAsyncEnumerable()
+            .Select(async (QuestionnaireEntity x, CancellationToken ct) => await x.ToModelAsync(_questionnaires))
+            .ToListAsync();
 
         return new ObjectResult(list);
     }
 
     [Function("GetQuestionnairesWithKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnairesWithKeyword",
-        tags: ["Questionnaires"],
-        Summary = "Get questionnaires with keyword"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnairesWithKeyword", ["Questionnaires"], Summary = "Get questionnaires with keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -99,13 +98,18 @@ public class Questionnaire_v1
         typeof(List<Questionnaire>),
         Description = "List of questionnaires containing querried keyword")]
     [OpenApiParameter("keyword", Description = "Keyword to query", In = ParameterLocation.Path, Required = true)]
+    [OpenApiParameter("lang",
+        In = ParameterLocation.Query,
+        Required = false,
+        Description = "Set to return questionnaires in a specific language")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetQuestionnairesWithKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaires/{keyword}")] HttpRequest req,
         FunctionContext context,
-        string keyword)
+        string keyword,
+        [FromQuery] string? lang = null)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth is null)
@@ -130,7 +134,7 @@ public class Questionnaire_v1
                 continue;
 
             var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
-            if (entity is null)
+            if (entity is null || (lang != null && entity.Lang != lang))
                 continue;
 
             questionnaires.Add(await entity.ToModelAsync(_questionnaires));
@@ -140,13 +144,8 @@ public class Questionnaire_v1
     }
 
     [Function("GetQuestionnaireWithId_v1")]
-    [OpenApiOperation(
-        operationId: "getQuestionnaireWithId",
-        tags: ["Questionnaires"],
-        Summary = "Retrieve a questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getQuestionnaireWithId", ["Questionnaires"], Summary = "Retrieve a questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -180,14 +179,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "queryQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Query questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryQuestionnaire", ["Questionnaires"], Summary = "Query questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -216,27 +209,35 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(query))
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
+            return new InternalServerErrorResult();
+        }
+
+        int relevance = await _moduleConfigService.Get<int>(auth.Platform, ModuleSettings.Memory_VectorSearchRelevanceThreshold);
         var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var queryResponse = await aiService.QueryQuestionnaires(queryWords);
+        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords, relevance / 100.0f);
 
         if (queryResponse == null || queryResponse.Results == null)
             return new NotFoundResult();
 
         var questionnaireId = queryResponse.Results
-            .Where(x => x.Relevance.HasValue && x.Relevance.Value > 0.7)
             .Where(x => string.IsNullOrEmpty(lang) || lang == x.Language)
             .Select(x => x.Id)
             .FirstOrDefault();
@@ -253,14 +254,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryFeedbackQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "queryFeedbackQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Query feedback questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryFeedbackQuestionnaire", ["Questionnaires"], Summary = "Query feedback questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -283,22 +278,15 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
-
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
 
         // Retrieve all feedback questionnaires matching the IsFeedback = true condition
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
 
         //filter by language
         var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
-    
+
         //if not in seleected language, then English
         if (feedbackQuestionnaire == null)
         {
@@ -318,13 +306,8 @@ public class Questionnaire_v1
 
 
     [Function("PostQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "postQuestionnaire",
-        tags: ["Questionnaires"],
-        Summary = "Store new questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postQuestionnaire", ["Questionnaires"], Summary = "Store new questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -337,46 +320,53 @@ public class Questionnaire_v1
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/questionnaire")] HttpRequest req,
         FunctionContext context)
     {
-        
+
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
-        
+
         Console.WriteLine("Received Questionnaire:");
         Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
 
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
+            return new InternalServerErrorResult();
+        }
+
         questionnaire.Id = Guid.NewGuid();
 
-        
         var entity = new QuestionnaireEntity(questionnaire);
 
         {
-           var words = await KeywordHelper.UpdateKeywords(
-                _tables,
-                ResourceTypes.Questionnaire,
-                entity.Id(),
-                [],
-                questionnaire.Keywords ?? []);
+            var words = await KeywordHelper.UpdateKeywords(
+                 _tables,
+                 ResourceTypes.Questionnaire,
+                 entity.Id(),
+                 [],
+                 questionnaire.Keywords ?? []);
 
             entity.Keywords = string.Join(",", words);
         }
 
         {
-            var embedResult = await aiService.CreateQuestionnaireEmbedding(questionnaire);
+            var embedResult = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -400,16 +390,11 @@ public class Questionnaire_v1
 
 
     [Function("PutQuestionnaire_v1")]
-    [OpenApiOperation(
-            operationId: "putQuestionnaire",
-            tags: ["Questionnaires"],
-            Summary = "Edit existing questionnaire")]
-    [OpenApiSecurity(
-            schemeName: "bearer_auth",
-            schemeType: SecuritySchemeType.Http,
-            Scheme = OpenApiSecuritySchemeType.Bearer,
-            BearerFormat = "JWT",
-            Description = "User token")]
+    [OpenApiOperation("putQuestionnaire", ["Questionnaires"], Summary = "Edit existing questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
     [OpenApiParameter("id", Description = "Questionnaire identifier", Required = true)]
     [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "Questionnaire", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Questionnaire")]
@@ -425,7 +410,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
@@ -435,10 +420,18 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new BadRequestResult();
 
-        var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
-        if (aiService == null)
+        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+        if (aiModule == null)
         {
             _log.LogCritical("Default AI module not configured");
+            return new InternalServerErrorResult();
+        }
+
+        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        if (aiDatabase == null)
+        {
+            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
@@ -477,7 +470,7 @@ public class Questionnaire_v1
 
         if (entity.EmbeddingId != null)
         {
-            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
+            bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");
@@ -485,7 +478,7 @@ public class Questionnaire_v1
             }
         }
 
-        var embed = await aiService.CreateQuestionnaireEmbedding(questionnaire);
+        var embed = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
         var embedId = embed?.Ids?.FirstOrDefault();
         if (embedId == null)
         {
@@ -505,13 +498,8 @@ public class Questionnaire_v1
 
 
     [Function("DeleteQuestionnaire_v1")]
-    [OpenApiOperation(
-        operationId: "deleteQuestionnaireWithId",
-        tags: ["Questionnaires"],
-        Summary = "Delete a questionnaire")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteQuestionnaireWithId", ["Questionnaires"], Summary = "Delete a questionnaire")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -530,7 +518,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
@@ -551,14 +539,22 @@ public class Questionnaire_v1
 
         if (entity.EmbeddingId != null)
         {
-            var aiService = await _clientFactory.CreateAiClient(auth.JwtEncodedToken);
-            if (aiService == null)
+            var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+            if (aiModule == null)
             {
                 _log.LogCritical("Default AI module not configured");
                 return new InternalServerErrorResult();
             }
 
-            bool result = await aiService.DeleteQuestionnaireEmbedding(entity.EmbeddingId);
+            var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            if (aiDatabase == null)
+            {
+                _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
+                return new InternalServerErrorResult();
+            }
+
+            bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);
             if (!result)
             {
                 _log.LogCritical("Failed to delete questionnaire embeddings");
@@ -576,14 +572,8 @@ public class Questionnaire_v1
     }
 
     [Function("QueryFeedbackLanguages_v1")]
-    [OpenApiOperation(
-        operationId: "queryFeedbackLanguages",
-        tags: ["Questionnaires"],
-        Summary = "Query languages that already have feedback questionnaires"
-    )]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryFeedbackLanguages", ["Questionnaires"], Summary = "Query languages that already have feedback questionnaires")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -600,13 +590,6 @@ public class Questionnaire_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
-
-        var aiService = await _clientFactory.CreateAiClient(auth!.JwtEncodedToken);
-        if (aiService == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
 
         // Retrieve all feedback questionnaires
         var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);

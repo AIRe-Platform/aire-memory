@@ -69,9 +69,12 @@ public class UserDeleteQueue
         {
             _log.LogWarning("User data anonymization is not allowed. Deleting statistics data related to the user.");
             string filter = $"user_id eq '{options.UserId}'";
-            await _stats
-                .QueryAsync<TableEntity>(filter)
-                .ForEachAsync(async x => await _stats.DeleteEntityAsync(x));
+            var query = _stats.QueryAsync<TableEntity>(filter);
+            var queryResults = await query.ToListAsync();
+            foreach (var x in queryResults)
+            {
+                await _stats.DeleteEntityAsync(x);
+            }
         }
 
         _log.LogInformation("Tasks completed.");

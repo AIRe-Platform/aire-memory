@@ -25,6 +25,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AzureWebJobsStorage": "",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+        "AIRE_MODULE_ID": "aire.development.memory",
         "AIRE_SERVICE_BASE": "http://localhost:7071/api/",
         "AIRE_SERVICE_KEY": "<service key secret>",
         "TOKEN_ENCRYPTION_KEY": "<enryption key shared between platform modules>",
@@ -40,6 +41,17 @@ You should create `local.settings.json` in the root of the repository when devel
 
 Use the same token keys you are using in AIRe Services module.
 
+## Module Settings
+
+AIRe Services platform module may configure the following settings:
+
+```jsonc
+{
+    // Tells AI module which vector database to use to store this service's embeddings
+    "vector_database_name": "aire_development_memory_db"
+}
+```
+
 ## API Documentation
 
 Visit path `/api/swagger/ui` to inspect. The default host is set to `/api` path.
@@ -50,6 +62,7 @@ You can set a custom host with `OpenApi__HostNames` environment value.
 
 Publish the Fuctions app and then setup the following required environment values:
 
+- `AIRE_MODULE_ID` The identifier of the module as it is configured in the platform.
 - `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
 - `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.

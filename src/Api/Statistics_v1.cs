@@ -15,7 +15,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 
 namespace Aire.Memory.Api;
@@ -25,25 +24,18 @@ public class Statistics_v1
     private readonly ITableStorageService _storage;
     private readonly TableClient _stats;
     private readonly IJwtTokenService _jwt;
-    private readonly ILogger<Statistics_v1> _log;
 
-    public Statistics_v1(ITableStorageService storage, TableServiceClient tableClient, IJwtTokenService jwt, ILogger<Statistics_v1> log)
+    public Statistics_v1(ITableStorageService storage, TableServiceClient tableClient, IJwtTokenService jwt)
     {
         _storage = storage;
         _stats = tableClient.GetTableClient(AireConstants.Tables.Statistics);
         _stats.CreateIfNotExists();
         _jwt = jwt;
-        _log = log;
     }
 
     [Function("GetStatisticsInfo_v1")]
-    [OpenApiOperation(
-        operationId: "getStatisticsInfo_v1",
-        tags: ["Statistics"],
-        Summary = "Get statistics info")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getStatisticsInfo_v1", ["Statistics"], Summary = "Get statistics info")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -73,15 +65,16 @@ public class Statistics_v1
 
         var filter = StatisticsEntity.CreateFilter(from.Value, to, eventNamePrefix);
         var query = await _storage.QueryAsync<StatisticsEntity>(filter);
-        var resultsByEventName = query.Select(x => x.ToModel()).GroupBy(x => x.EventName);
+        var queryResults = await query.ToListAsync();
+        var resultsByEventName = queryResults.Select(x => x.ToModel()).GroupBy(x => x.EventName);
 
         var results = new List<StatisticsEventInfo>();
-        await foreach (var g in resultsByEventName)
+        foreach (var g in resultsByEventName)
         {
             var info = new StatisticsEventInfo()
             {
                 EventName = g.Key,
-                EventCount = await g.SumAsync(x => x.EventCount)
+                EventCount = g.Sum(x => x.EventCount)
             };
             results.Add(info);
         }
@@ -90,13 +83,9 @@ public class Statistics_v1
     }
 
     [Function("QueryStatisticsEvents_v1")]
-    [OpenApiOperation(
-        operationId: "queryStatisticsEvents",
-        tags: ["Statistics"],
+    [OpenApiOperation("queryStatisticsEvents", ["Statistics"],
         Summary = "Query statistics events")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -139,13 +128,8 @@ public class Statistics_v1
     }
 
     [Function("PostStatisticsEvent_v1")]
-    [OpenApiOperation(
-        operationId: "postStatisticsEvent",
-        tags: ["Statistics"],
-        Summary = "Post new statistics event")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("postStatisticsEvent", ["Statistics"], Summary = "Post new statistics event")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -196,13 +180,8 @@ public class Statistics_v1
     }
 
     [Function("UpdateStatisticsEvent_v1")]
-    [OpenApiOperation(
-        operationId: "updateStatisticsEvent",
-        tags: ["Statistics"],
-        Summary = "Update statistics event")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("updateStatisticsEvent", ["Statistics"], Summary = "Update statistics event")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]

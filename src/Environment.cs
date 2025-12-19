@@ -3,16 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 
-namespace Aire.Memory
+namespace Aire.Memory;
+
+public static class AireMemoryEnvironment
 {
-    public static class AireEnvironment
-    {
-        public static string? DatabaseConnectionString => Environment.GetEnvironmentVariable("DatabaseConnectionString");
-        public static string? StorageConnectionString => Environment.GetEnvironmentVariable("StorageConnectionString");
-        public static string? TokenSigningKey => Environment.GetEnvironmentVariable("TOKEN_SIGNING_KEY");
-        public static string? TokenEncryptionKey => Environment.GetEnvironmentVariable("TOKEN_ENCRYPTION_KEY");
-        public static string? PlatformServiceKey => Environment.GetEnvironmentVariable("AIRE_SERVICE_KEY");
-        public static string? PlatformServiceUrl => Environment.GetEnvironmentVariable("AIRE_SERVICE_BASE");
-        public static string? OpenApiHost => Environment.GetEnvironmentVariable("OpenApi__HostNames");
-    }
+    public static string? DatabaseConnectionString => Environment.GetEnvironmentVariable("DatabaseConnectionString");
+    public static string? StorageConnectionString => Environment.GetEnvironmentVariable("StorageConnectionString");
+    public static string? OpenApiHost => Environment.GetEnvironmentVariable("OpenApi__HostNames");
 }
+

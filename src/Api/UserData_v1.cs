@@ -52,13 +52,8 @@ public class UserData_v1
     }
 
     [Function("GetUserData_v1")]
-    [OpenApiOperation(
-        operationId: "getUserData",
-        tags: ["User data"],
-        Summary = "Get all personal data collected")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getUserData", ["User data"], Summary = "Get all personal data collected")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -91,20 +86,21 @@ public class UserData_v1
             .ToList();
 
         Dictionary<string, ChatLog> chatlogs = [];
-        foreach(var entry in chatlogs_entries) {
+        foreach (var entry in chatlogs_entries)
+        {
             var item = await entry.GetFromBlob(_chatlogs, auth.UserKey);
-            if(item != null)
+            if (item != null)
                 chatlogs.Add(entry.Id(), item);
         }
 
         var questionnaire_entries = await _storage.Partition<QuestionnaireResultsEntity>(auth.UserId);
         var questionnaires = await questionnaire_entries
             .ToAsyncEnumerable()
-            .SelectAwait(async x => await x.GetFromBlob(_questionnaires, auth.UserKey))
+            .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.GetFromBlob(_questionnaires, auth.UserKey))
             .Where(x => x != null)
             .ToListAsync();
 
-        var data = new GDPRDataCollection
+        var data = new GDPRMemoryDataCollection
         {
             Chats = chatlogs_metadata,
             Chatlogs = chatlogs!,
@@ -115,13 +111,8 @@ public class UserData_v1
     }
 
     [Function("DeleteUserData_v1")]
-    [OpenApiOperation(
-        operationId: "deleteUserData",
-        tags: ["User data"],
-        Summary = "Queue ALL user data for deletion (or anonymization)")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteUserData", ["User data"], Summary = "Queue ALL user data for deletion (or anonymization)")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]

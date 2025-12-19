@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
@@ -28,26 +27,19 @@ public class Reminders_v1
     private readonly BlobContainerClient _reminders;
     private readonly ITableStorageService _tables;
     private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
 
-    public Reminders_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt, ILogger<Reminders_v1> log)
+    public Reminders_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt)
     {
         _reminders = blobs.GetBlobContainerClient(AireConstants.Blobs.Reminders);
         _reminders.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _tables = tables;
         _jwt = jwt;
-        _log = log;
     }
 
     [Function("GetReminders_v1")]
-    [OpenApiOperation(
-        operationId: "getReminders",
-        tags: ["Reminders"],
-        Summary = "Get reminders")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getReminders", ["Reminders"], Summary = "Get reminders")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -88,13 +80,8 @@ public class Reminders_v1
     }
 
     [Function("GetReminderById_v1")]
-    [OpenApiOperation(
-        operationId: "getReminderById",
-        tags: ["Reminders"],
-        Summary = "Get reminder by ID")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getReminderById", tags: ["Reminders"], Summary = "Get reminder by ID")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -126,13 +113,8 @@ public class Reminders_v1
     }
 
     [Function("CreateReminder_v1")]
-    [OpenApiOperation(
-        operationId: "createReminder",
-        tags: ["Reminders"],
-        Summary = "Create a reminder")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("createReminder", ["Reminders"], Summary = "Create a reminder")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -172,13 +154,8 @@ public class Reminders_v1
     }
 
     [Function("EditReminder_v1")]
-    [OpenApiOperation(
-        operationId: "editReminder",
-        tags: ["Reminders"],
-        Summary = "Edit existing reminder")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("editReminder", ["Reminders"], Summary = "Edit existing reminder")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -226,13 +203,8 @@ public class Reminders_v1
     }
 
     [Function("DeleteReminder_v1")]
-    [OpenApiOperation(
-        operationId: "deleteReminder",
-        tags: ["Reminders"],
-        Summary = "Delete reminder")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteReminder", ["Reminders"], Summary = "Delete reminder")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
