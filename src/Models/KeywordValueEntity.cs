@@ -44,6 +44,17 @@ public class KeywordValueEntity : BaseTableEntity
         return RowKey ?? "";
     }
 
+    [IgnoreDataMember]
+    public List<string> Documents
+    {
+        get
+        {
+            if (Document != null)
+                return Document.JsonToObject<List<string>>() ?? [Document];
+            return [];
+        }
+    }
+
     public static string? PartitionFromValue(string value)
     {
         if (value.Length < 2)
@@ -72,7 +83,7 @@ public class KeywordValueEntity : BaseTableEntity
         Stats = [];
         Translations = keyword.Translations.ObjectToJson();
         Prompt = keyword.Prompt;
-        Document = keyword.Document;
+        Document = keyword.Documents.ObjectToJson();
     }
 
     public Keyword ToModel()
@@ -83,7 +94,7 @@ public class KeywordValueEntity : BaseTableEntity
             Stats = Stats,
             Translations = Translations?.JsonToObject<List<Translation>>(),
             Prompt = Prompt,
-            Document = Document
+            Documents = Documents
         };
     }
 }

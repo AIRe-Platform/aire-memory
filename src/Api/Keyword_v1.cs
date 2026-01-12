@@ -217,9 +217,10 @@ public class Keyword_v1(ITableStorageService tables, IJwtTokenService jwt, ILogg
             return new BadRequestResult();
 
         var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        if (entity == null)
+            return new NotFoundResult();
 
         entity = new KeywordValueEntity(body);
-
         var result = await _tables.UpsertAsync(entity);
         if (!result)
             return new InternalErrorResult();
