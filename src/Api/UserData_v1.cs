@@ -81,7 +81,7 @@ public class UserData_v1
             .Select(x => new ChatLogMetadata
             {
                 Id = x.Id(),
-                Time = x.Timestamp
+                Time = x.Timestamp?.UtcDateTime
             })
             .ToList();
 

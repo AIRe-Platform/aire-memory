@@ -62,7 +62,7 @@ public class ChatHistory_v1
         var list = logs.Select(x => new ChatLogMetadata
         {
             Id = x.Id(),
-            Time = x.Timestamp
+            Time = x.Timestamp?.UtcDateTime
         }).ToList();
 
         return new ObjectResult(list);
@@ -103,6 +103,12 @@ public class ChatHistory_v1
         if (chat == null)
             return new NotFoundResult();
 
+        chat.Metadata = new ChatLogMetadata
+        {
+            Id = id,
+            Time = entity.Timestamp?.UtcDateTime
+        };
+
         return new ObjectResult(chat);
     }
 
@@ -142,7 +148,7 @@ public class ChatHistory_v1
         var metadata = new ChatLogMetadata
         {
             Id = entity.Id(),
-            Time = entity.Timestamp
+            Time = entity.Timestamp?.UtcDateTime
         };
         return new ObjectResult(metadata);
     }
@@ -192,7 +198,7 @@ public class ChatHistory_v1
         var metadata = new ChatLogMetadata
         {
             Id = chatlog.Id(),
-            Time = chatlog.Timestamp
+            Time = chatlog.Timestamp?.UtcDateTime
         };
 
         return new ObjectResult(metadata);
