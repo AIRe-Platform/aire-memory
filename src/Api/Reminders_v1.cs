@@ -13,27 +13,27 @@ using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
-using Aire.Sdk.Azure;
 using Aire.Sdk.Models.Resources;
 using InternalErrorResult = System.Web.Http.InternalServerErrorResult;
-using Aire.Sdk.Auth.Extensions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Aire.Memory.Services;
+using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
 public class Reminders_v1
 {
     private readonly BlobContainerClient _reminders;
-    private readonly ITableStorageService _tables;
+    private readonly MemoryStorageService _storageService;
     private readonly IJwtTokenService _jwt;
 
-    public Reminders_v1(BlobServiceClient blobs, ITableStorageService tables, IJwtTokenService jwt)
+    public Reminders_v1(BlobServiceClient blobs, MemoryStorageService storageService, IJwtTokenService jwt)
     {
         _reminders = blobs.GetBlobContainerClient(AireConstants.Blobs.Reminders);
         _reminders.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
-        _tables = tables;
+        _storageService = storageService;
         _jwt = jwt;
     }
 
@@ -47,6 +47,7 @@ public class Reminders_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     [OpenApiParameter("include_active", In = ParameterLocation.Query, Type = typeof(bool), Required = false, Description = "Include already seen reminders")]
     public async Task<IActionResult> GetScheduledEvents(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/reminders")] HttpRequest req,
@@ -54,13 +55,18 @@ public class Reminders_v1
         [FromQuery(Name = "include_inactive")] bool includeInactive = false)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null && !req.IsServiceRequest())
+        if (auth == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadReminders))
             return new ForbiddenResult();
 
-        var query = await _tables
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var query = await tables
             .QueryAsync<ReminderEntity>(x =>
                 x.PartitionKey == auth!.UserId &&
                 (includeInactive || !x.ReadTimestamp.HasValue));
@@ -90,19 +96,25 @@ public class Reminders_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetReminderById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/reminder/{id}")] HttpRequest req,
         FunctionContext context,
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null && !req.IsServiceRequest())
+        if (auth == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadReminders))
             return new ForbiddenResult();
 
-        var entity = await _tables.RetrieveAsync<ReminderEntity>(auth!.UserId, id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<ReminderEntity>(auth!.UserId, id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -120,7 +132,7 @@ public class Reminders_v1
         Description = "User token")]
     [OpenApiRequestBody("application/json", typeof(Reminder), Description = "New reminder", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Reminder), Description = "Saved reminder")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> CreateReminder(
@@ -142,10 +154,15 @@ public class Reminders_v1
             return new BadRequestResult();
         }
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         var entity = new ReminderEntity(reminder, auth.UserId);
         await entity.SaveContentToBlob(_reminders, reminder.Content, auth.UserKey);
 
-        var result = await _tables.UpsertAsync(entity);
+        var result = await tables.UpsertAsync(entity);
         if (!result)
             return new InternalErrorResult();
 
@@ -162,7 +179,7 @@ public class Reminders_v1
     [OpenApiParameter("id", Description = "Reminder identifier", Required = true, In = ParameterLocation.Path)]
     [OpenApiRequestBody("application/json", typeof(Reminder), Description = "An event", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Reminder), Description = "Edited reminder")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
@@ -185,7 +202,12 @@ public class Reminders_v1
         if (reminder == null)
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<ReminderEntity>(auth.UserId, id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<ReminderEntity>(auth.UserId, id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -195,7 +217,7 @@ public class Reminders_v1
         if (reminder.Content != null)
             await entity.SaveContentToBlob(_reminders, reminder.Content, auth.UserKey);
 
-        var update = await _tables.UpsertAsync(entity);
+        var update = await tables.UpsertAsync(entity);
         if (!update)
             return new InternalErrorResult();
 
@@ -210,7 +232,7 @@ public class Reminders_v1
         Description = "User token")]
     [OpenApiParameter("id", Description = "Reminder identifier", Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid id")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid id or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
@@ -229,7 +251,12 @@ public class Reminders_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var result = await _tables.DeleteAsync<ReminderEntity>(auth.UserId, id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var result = await tables.DeleteAsync<ReminderEntity>(auth.UserId, id);
         if (result)
             return new NoContentResult();
         else

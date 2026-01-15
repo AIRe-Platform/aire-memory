@@ -7,6 +7,8 @@ namespace Aire.Memory.Models;
 
 public class UserDeleteOptions
 {
-    public string? UserId { get; set; }
-    public bool Anonymize { get; set; }
+    public required string UserId { get; set; }
+    public required bool Anonymize { get; set; }
+    public required string Platform { get; set; }
+    public required string Target { get; set; }
 }

@@ -4,7 +4,7 @@ This module handles storing the data that the AIRe platform manages.
 
 ## Getting Started
 
-You need to have [.NET 8.0](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) installed. Pull the repository and its submodules.
+You need to have [.NET 10.0](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) installed. Pull the repository and its submodules.
 
 Open the solution in VS Code (recommended, works on Windows/Linux/macOS). You may also use Visual Studio on macOS and Windows.
 
@@ -25,7 +25,7 @@ You should create `local.settings.json` in the root of the repository when devel
         "AzureWebJobsStorage": "",
         "StorageConnectionString": "<Connection string for Table storage or storage emulator>",
         "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-        "AIRE_MODULE_ID": "aire.development.memory",
+        "AIRE_MODULE_ID": "aire.development.memory.*",
         "AIRE_SERVICE_BASE": "http://localhost:7071/api/",
         "AIRE_SERVICE_KEY": "<service key secret>",
         "TOKEN_ENCRYPTION_KEY": "<enryption key shared between platform modules>",
@@ -48,7 +48,10 @@ AIRe Services platform module may configure the following settings:
 ```jsonc
 {
     // Tells AI module which vector database to use to store this service's embeddings
-    "vector_database_name": "aire_development_memory_db"
+    "vector_database_name": "aire_development_memory_db",
+
+    // Use table name prefix (optional)
+    "table_prefix": ""
 }
 ```
 
@@ -62,7 +65,12 @@ You can set a custom host with `OpenApi__HostNames` environment value.
 
 Publish the Fuctions app and then setup the following required environment values:
 
-- `AIRE_MODULE_ID` The identifier of the module as it is configured in the platform.
+- `AIRE_MODULE_ID` The identifier of the module as it is configured in the platform. 
+  - If the module has different 'compartments', use wildcard `*` to accept sub IDs.
+    - Clients calling the module need to use `Aire-Service-Target` header to tell which compartment they want to use.
+  - This is the case if you share the module between platform and want to separate the data. 
+    - Or, if you want to use the module multiple times in the platform but with different service configurations.
+    - Use `table_prefix` service setting to separate tables.
 - `AIRE_SERVICE_BASE` The endpoint of the AIRe Services module.
 - `AIRE_SERVICE_KEY` The service key for the AIRe Services module.
 - `TOKEN_SIGNING_KEY` The token signing key shared between the platform instance modules.

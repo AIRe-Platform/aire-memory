@@ -5,9 +5,10 @@
 using System.Net;
 using Aire.Memory.Helpers;
 using Aire.Memory.Models;
+using Aire.Memory.Services;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
-using Aire.Sdk.Azure;
+using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Models.Statistics;
 using Azure.Data.Tables;
 using Microsoft.AspNetCore.Http;
@@ -19,19 +20,10 @@ using Microsoft.OpenApi.Models;
 
 namespace Aire.Memory.Api;
 
-public class Statistics_v1
+public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService jwt)
 {
-    private readonly ITableStorageService _storage;
-    private readonly TableClient _stats;
-    private readonly IJwtTokenService _jwt;
-
-    public Statistics_v1(ITableStorageService storage, TableServiceClient tableClient, IJwtTokenService jwt)
-    {
-        _storage = storage;
-        _stats = tableClient.GetTableClient(AireConstants.Tables.Statistics);
-        _stats.CreateIfNotExists();
-        _jwt = jwt;
-    }
+    private readonly MemoryStorageService _storageService = storageService;
+    private readonly IJwtTokenService _jwt = jwt;
 
     [Function("GetStatisticsInfo_v1")]
     [OpenApiOperation("getStatisticsInfo_v1", ["Statistics"], Summary = "Get statistics info")]
@@ -44,7 +36,7 @@ public class Statistics_v1
     [OpenApiParameter("eventNamePrefix", Description = "Event name filter", In = ParameterLocation.Query, Required = false)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<StatisticsEventInfo>), Description = "List of event info")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters, or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetStatisticsInfo(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/stats")] HttpRequest req,
@@ -63,8 +55,13 @@ public class Statistics_v1
         if (!from.HasValue)
             return new BadRequestResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         var filter = StatisticsEntity.CreateFilter(from.Value, to, eventNamePrefix);
-        var query = await _storage.QueryAsync<StatisticsEntity>(filter);
+        var query = await tables.QueryAsync<StatisticsEntity>(filter);
         var queryResults = await query.ToListAsync();
         var resultsByEventName = queryResults.Select(x => x.ToModel()).GroupBy(x => x.EventName);
 
@@ -94,7 +91,7 @@ public class Statistics_v1
     [OpenApiParameter("to", Description = "End datetime", In = ParameterLocation.Query, Required = false)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<object>), Description = "List of event objects")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters, or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> QueryStatisticsEvents(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/stats/events")] HttpRequest req,
@@ -110,6 +107,12 @@ public class Statistics_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadStatistics))
             return new ForbiddenResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
+
         var eventNames = events?.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
         if (eventNames.Length == 0 || !from.HasValue)
             return new BadRequestResult();
@@ -119,7 +122,7 @@ public class Statistics_v1
         foreach (var e in eventNames)
         {
             var filter = StatisticsHelper.GenerateEventPartitionFilter(e, from.Value, to);
-            var query = await _stats.QueryAsync<TableEntity>(filter).ToListAsync();
+            var query = await stats.QueryAsync<TableEntity>(filter).ToListAsync();
             var models = query.Select(StatisticsHelper.EventEntityToModel);
             results.AddRange(models);
         }
@@ -135,7 +138,7 @@ public class Statistics_v1
         Description = "User token")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(object), Description = "Event object")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid payload")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid payload or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.UnprocessableEntity, Description = "Missing required fields")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiRequestBody("application/json", typeof(object), Description = "A new event object", Required = true)]
@@ -157,6 +160,12 @@ public class Statistics_v1
         if (string.IsNullOrWhiteSpace(data.EventName) || !data.Timestamp.HasValue)
             return new UnprocessableEntityResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
+
         var (pk, rk) = StatisticsHelper.GenerateTableKeys(data.Timestamp.Value, data.EventName);
         var ent = new TableEntity(data)
         {
@@ -164,15 +173,15 @@ public class Statistics_v1
             RowKey = rk
         };
 
-        await _stats.AddEntityAsync(ent);
+        await stats.AddEntityAsync(ent);
 
         // Update info entity
         {
             var keys = StatisticsEntity.CreateTableKeys(data.Timestamp.Value, data.EventName);
-            var info = await _storage.RetrieveAsync<StatisticsEntity>(keys.pk, keys.rk);
+            var info = await tables.RetrieveAsync<StatisticsEntity>(keys.pk, keys.rk);
             info ??= new StatisticsEntity(data.EventName);
             info.Count += 1;
-            await _storage.UpsertAsync(info);
+            await tables.UpsertAsync(info);
         }
 
         var model = StatisticsHelper.EventEntityToModel(ent);
@@ -192,6 +201,7 @@ public class Statistics_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Conflict, Description = "Identifier mismatch")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiRequestBody("application/json", typeof(object), Description = "Existing event object", Required = true)]
     public async Task<IActionResult> UpdateStatisticsEvent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/stats/event/{id}")] HttpRequest req,
@@ -209,6 +219,12 @@ public class Statistics_v1
         if (data == null)
             return new BadRequestResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
+
         if (string.IsNullOrWhiteSpace(data.EventName) || !data.Timestamp.HasValue)
             return new UnprocessableEntityResult();
 
@@ -216,14 +232,14 @@ public class Statistics_v1
             return new ConflictResult();
 
         var (pk, rk) = StatisticsHelper.GenerateTableKeys(data.Timestamp.Value, data.EventName, id);
-        var query = await _stats.GetEntityIfExistsAsync<TableEntity>(pk, rk);
+        var query = await stats.GetEntityIfExistsAsync<TableEntity>(pk, rk);
         if (!query.HasValue)
             return new NotFoundResult();
 
         var ent = query.Value!;
         StatisticsHelper.MergeEventDataToEntity(ent, data);
 
-        await _stats.UpsertEntityAsync(ent, TableUpdateMode.Replace);
+        await stats.UpsertEntityAsync(ent, TableUpdateMode.Replace);
 
         var model = StatisticsHelper.EventEntityToModel(ent);
         return new OkObjectResult(model);
