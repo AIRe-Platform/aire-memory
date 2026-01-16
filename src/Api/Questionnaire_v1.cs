@@ -17,20 +17,21 @@ using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
 using Aire.Sdk.Platform.Clients;
-using Aire.Sdk.Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
 using Newtonsoft.Json;
 using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
+using Aire.Memory.Services;
+using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
 public class Questionnaire_v1
 {
     private readonly BlobContainerClient _questionnaires;
-    private readonly ITableStorageService _tables;
+    private readonly MemoryStorageService _storageService;
     private readonly IJwtTokenService _jwt;
     private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
@@ -39,7 +40,7 @@ public class Questionnaire_v1
 
     public Questionnaire_v1(
         BlobServiceClient blobs,
-        ITableStorageService tables,
+        MemoryStorageService storageService,
         IJwtTokenService jwt,
         IAirePlatformService platformService,
         IAireClientFactory clientFactory,
@@ -49,7 +50,7 @@ public class Questionnaire_v1
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.Questionnaires);
         _questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
-        _tables = tables;
+        _storageService = storageService;
         _jwt = jwt;
         _platform = platformService;
         _clientFactory = clientFactory;
@@ -66,6 +67,7 @@ public class Questionnaire_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Questionnaire>), Description = "List of questionnaires")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetQuestionnaires(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaires")] HttpRequest req,
         FunctionContext context)
@@ -77,7 +79,12 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
-        var all = await _tables.All<QuestionnaireEntity>();
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var all = await tables.All<QuestionnaireEntity>();
         var list = await all
             .ToAsyncEnumerable()
             .Select(async (QuestionnaireEntity x, CancellationToken ct) => await x.ToModelAsync(_questionnaires))
@@ -102,7 +109,7 @@ public class Questionnaire_v1
         In = ParameterLocation.Query,
         Required = false,
         Description = "Set to return questionnaires in a specific language")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetQuestionnairesWithKeyword(
@@ -122,8 +129,13 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(keyword))
             return new BadRequestResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         var questionnaires = new List<Questionnaire>();
-        var indexes = await _tables.Partition<KeywordIndexEntity>(
+        var indexes = await tables.Partition<KeywordIndexEntity>(
             KeywordIndexEntity.PartitionForResource(ResourceTypes.Questionnaire, keyword)!);
         if (indexes is null || indexes.Count == 0)
             return new ObjectResult(questionnaires);
@@ -133,7 +145,7 @@ public class Questionnaire_v1
             if (index.RowKey is null)
                 continue;
 
-            var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
+            var entity = await tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
             if (entity is null || (lang != null && entity.Lang != lang))
                 continue;
 
@@ -152,7 +164,7 @@ public class Questionnaire_v1
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Questionnaire>), Description = "List of questionnaires")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetQuestionnaireWithId(
@@ -170,7 +182,12 @@ public class Questionnaire_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -196,7 +213,7 @@ public class Questionnaire_v1
         Description = "Set to return questionnaires in a specific language")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Best matching questionnaire")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> QueryQuestionnaire(
@@ -209,11 +226,16 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(query))
             return new BadRequestResult();
+
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -245,7 +267,7 @@ public class Questionnaire_v1
         if (questionnaireId == null)
             return new NotFoundResult();
 
-        var questionnaire = await _tables.RetrieveAsync<QuestionnaireEntity>(questionnaireId);
+        var questionnaire = await tables.RetrieveAsync<QuestionnaireEntity>(questionnaireId);
         if (questionnaire == null)
             return new NotFoundResult();
 
@@ -266,7 +288,7 @@ public class Questionnaire_v1
         Description = "Set to return feedback questionnaires in a specific language")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Feedback questionnaire")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid parameters")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid parameters, or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> QueryFeedbackQuestionnaire(
@@ -278,11 +300,16 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         // Retrieve all feedback questionnaires matching the IsFeedback = true condition
-        var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
+        var feedbackQuestionnaires = await tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
 
         //filter by language
         var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
@@ -313,7 +340,7 @@ public class Questionnaire_v1
         Description = "User token")]
     [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "A questionnaire", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Saved questionnaire")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostQuestionnaire(
@@ -325,8 +352,13 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
             return new ForbiddenResult();
+
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
@@ -356,7 +388,7 @@ public class Questionnaire_v1
 
         {
             var words = await KeywordHelper.UpdateKeywords(
-                 _tables,
+                 tables,
                  ResourceTypes.Questionnaire,
                  entity.Id(),
                  [],
@@ -381,7 +413,7 @@ public class Questionnaire_v1
 
         await entity.SaveToBlob(_questionnaires, questionnaire.Content);
 
-        var add = await _tables.UpsertAsync(entity);
+        var add = await tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
 
@@ -399,7 +431,7 @@ public class Questionnaire_v1
     [OpenApiRequestBody("application/json", typeof(Questionnaire), Description = "Questionnaire", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Questionnaire), Description = "Questionnaire")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param, or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     public async Task<IActionResult> PutQuestionnaire(
             [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/questionnaire/{id}")] HttpRequest req,
@@ -410,7 +442,7 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteQuestionnaire))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
@@ -419,6 +451,11 @@ public class Questionnaire_v1
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
+
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -435,7 +472,7 @@ public class Questionnaire_v1
             return new InternalServerErrorResult();
         }
 
-        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
+        var entity = await tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -449,7 +486,7 @@ public class Questionnaire_v1
             var originalKeywords = entity.Keywords?.Split(",");
 
             var words = await KeywordHelper.UpdateKeywords(
-                _tables,
+                tables,
                 ResourceTypes.Questionnaire,
                 entity.Id(),
                 originalKeywords ?? [],
@@ -489,7 +526,7 @@ public class Questionnaire_v1
 
         // Apply edits
 
-        var save = await _tables.UpsertAsync(entity);
+        var save = await tables.UpsertAsync(entity);
         if (!save)
             return new InternalServerErrorResult();
 
@@ -506,7 +543,7 @@ public class Questionnaire_v1
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Operation was successful")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The questionnaire was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteQuestionnaire(
@@ -518,19 +555,24 @@ public class Questionnaire_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteQuestionnaire))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<QuestionnaireEntity>(id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
         {
             await KeywordHelper.UpdateKeywords(
-                _tables,
+                tables,
                 ResourceTypes.Questionnaire,
                 entity.Id(),
                 entity.Keywords?.Split(",") ?? [],
@@ -564,7 +606,7 @@ public class Questionnaire_v1
 
         await _questionnaires.DeleteBlobIfExistsAsync(entity.Id());
 
-        var delete = await _tables.DeleteAsync(entity);
+        var delete = await tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
 
@@ -580,6 +622,7 @@ public class Questionnaire_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<string>), Description = "List of languages with feedback questionnaires")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> QueryFeedbackLanguages(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/feedback-languages")] HttpRequest req,
         FunctionContext context)
@@ -591,8 +634,13 @@ public class Questionnaire_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadQuestionnaire))
             return new ForbiddenResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         // Retrieve all feedback questionnaires
-        var feedbackQuestionnaires = await _tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
+        var feedbackQuestionnaires = await tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
 
         // Get a list of distinct languages for the feedback questionnaires
         var feedbackLanguages = await feedbackQuestionnaires

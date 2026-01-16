@@ -14,25 +14,26 @@ using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
-using Aire.Sdk.Azure;
 using System.Web.Http;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Aire.Memory.Services;
+using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
 public class QuestionnaireResults_v1
 {
     private readonly BlobContainerClient _blobs;
-    private readonly ITableStorageService _tables;
+    private readonly MemoryStorageService _storageService;
     private readonly IJwtTokenService _jwt;
 
-    public QuestionnaireResults_v1(BlobServiceClient blobs, ITableStorageService storage, IJwtTokenService jwt)
+    public QuestionnaireResults_v1(BlobServiceClient blobs, MemoryStorageService storageService, IJwtTokenService jwt)
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.QuestionnaireResults);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
-        _tables = storage;
+        _storageService = storageService;
         _jwt = jwt;
     }
 
@@ -51,7 +52,7 @@ public class QuestionnaireResults_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     public async Task<IActionResult> GetQuestionnaireResults(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
         FunctionContext context,
@@ -67,7 +68,12 @@ public class QuestionnaireResults_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var query = await _tables
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var query = await tables
             .QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == auth.UserId && x.QuestionnaireId == id);
 
         var results = await query.ToListAsync();
@@ -87,7 +93,7 @@ public class QuestionnaireResults_v1
         Description = "User token")]
     [OpenApiRequestBody("application/json", typeof(QuestionnaireResults), Description = "A questionnaire results", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(QuestionnaireResults), Description = "Saved questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostQuestionnaireResults(
@@ -105,6 +111,11 @@ public class QuestionnaireResults_v1
         if (results == null)
             return new BadRequestResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         results.Id = Guid.NewGuid().ToString();
         results.Timestamp = DateTime.UtcNow;
         var entity = new QuestionnaireResultsEntity(auth.UserId, results.Id)
@@ -114,7 +125,7 @@ public class QuestionnaireResults_v1
         };
         await entity.SaveToBlob(_blobs, results, auth.UserKey);
 
-        var add = await _tables.UpsertAsync(entity);
+        var add = await tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
 
@@ -129,7 +140,7 @@ public class QuestionnaireResults_v1
         Description = "User token")]
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Results not found")]
@@ -148,13 +159,18 @@ public class QuestionnaireResults_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<QuestionnaireResultsEntity>(auth.UserId, id);
         if (entity == null)
             return new NotFoundResult();
 
         await _blobs.DeleteBlobIfExistsAsync(entity.Id());
 
-        var delete = await _tables.DeleteAsync(entity);
+        var delete = await tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
 

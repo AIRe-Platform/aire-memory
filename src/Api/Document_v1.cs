@@ -24,12 +24,14 @@ using Aire.Memory.Helpers;
 using Aire.Sdk.Platform.Clients;
 using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
+using Aire.Memory.Services;
+using Aire.Sdk.Auth.Extensions;
 
 namespace Aire.Memory.Api;
 
 public class Document_v1
 {
-    private readonly ITableStorageService _storage;
+    private readonly MemoryStorageService _storageService;
     private readonly IJwtTokenService _jwt;
     private readonly BlobContainerClient _blobs;
     private readonly IAirePlatformService _platform;
@@ -39,7 +41,7 @@ public class Document_v1
 
     public Document_v1(
         BlobServiceClient blobs,
-        ITableStorageService storage,
+        MemoryStorageService storageService,
         IJwtTokenService jwt,
         IAirePlatformService platformService,
         IAireClientFactory clientFactory,
@@ -49,7 +51,7 @@ public class Document_v1
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Documents);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
-        _storage = storage;
+        _storageService = storageService;
         _jwt = jwt;
         _platform = platformService;
         _clientFactory = clientFactory;
@@ -66,6 +68,7 @@ public class Document_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<DocumentMetadata>), Description = "List of document metadata")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetDocuments(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/documents")] HttpRequest req,
         FunctionContext context)
@@ -77,7 +80,12 @@ public class Document_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadDocument))
             return new ForbiddenResult();
 
-        var all = await _storage.All<DocumentEntity>();
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var all = await tables.All<DocumentEntity>();
         var list = all.Select(x => x.ToModel()).ToList();
         return new OkObjectResult(list);
     }
@@ -91,7 +99,7 @@ public class Document_v1
     [OpenApiParameter("id", Description = "Document identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(DocumentMetadata), Description = "Document metadata")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The document was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetDocumentWithId(
@@ -109,7 +117,12 @@ public class Document_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<DocumentEntity>(id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<DocumentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -133,7 +146,7 @@ public class Document_v1
         Description = "User token")]
     [OpenApiRequestBody("multipart/form-data", typeof(DocumentUploadFormData), Description = "File upload with metadata", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(DocumentMetadata), Description = "Saved content")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostContent(
@@ -144,7 +157,7 @@ public class Document_v1
         if (auth == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument) || auth.Platform == null)
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument))
             return new ForbiddenResult();
 
         var formData = await req.ReadFormAsync();
@@ -156,6 +169,11 @@ public class Document_v1
         var metadata = jsonMetadata.ToString().JsonToObject<DocumentMetadata>();
         if (metadata == null || metadata.Source.HasValue || req.Form.Files.Count != 1)
             return new BadRequestResult();
+
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -202,7 +220,7 @@ public class Document_v1
         }
 
         // Insert entity
-        var result = await _storage.UpsertAsync(entity);
+        var result = await tables.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
 
@@ -219,7 +237,7 @@ public class Document_v1
     [OpenApiParameter("id", Description = "Document identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Operation was successful")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The document was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteDocument(
@@ -237,7 +255,12 @@ public class Document_v1
         if (!Guid.TryParse(id, out Guid _))
             return new BadRequestResult();
 
-        var entity = await _storage.RetrieveAsync<DocumentEntity>(id);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<DocumentEntity>(id);
         if (entity == null)
             return new NotFoundResult();
 
@@ -268,7 +291,7 @@ public class Document_v1
             }
         }
 
-        var delete = await _storage.DeleteAsync(entity);
+        var delete = await tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
 

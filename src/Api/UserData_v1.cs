@@ -5,9 +5,10 @@
 
 using System.Net;
 using Aire.Memory.Models;
+using Aire.Memory.Services;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
-using Aire.Sdk.Azure;
+using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Helpers;
 using Aire.Sdk.Models;
 using Aire.Sdk.Models.Chat;
@@ -30,12 +31,12 @@ public class UserData_v1
     private readonly BlobContainerClient _questionnaires;
     private readonly QueueClient _queue;
     private readonly IJwtTokenService _jwt;
-    private readonly ITableStorageService _storage;
+    private readonly MemoryStorageService _storageService;
     private readonly ILogger _log;
 
     public UserData_v1(
         BlobServiceClient blobs, QueueServiceClient queues, IJwtTokenService jwt,
-        ITableStorageService storage, ILogger<UserData_v1> log)
+        MemoryStorageService storageService, ILogger<UserData_v1> log)
     {
         _chatlogs = blobs.GetBlobContainerClient(AireConstants.Blobs.ChatLogs);
         _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
@@ -47,7 +48,7 @@ public class UserData_v1
         _queue.CreateIfNotExists();
 
         _jwt = jwt;
-        _storage = storage;
+        _storageService = storageService;
         _log = log;
     }
 
@@ -76,12 +77,17 @@ public class UserData_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
 
-        var chatlogs_entries = await _storage.Partition<ChatLogEntity>(auth.UserId);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var chatlogs_entries = await tables.Partition<ChatLogEntity>(auth.UserId);
         var chatlogs_metadata = chatlogs_entries
             .Select(x => new ChatLogMetadata
             {
                 Id = x.Id(),
-                Time = x.Timestamp
+                Time = x.Timestamp?.UtcDateTime
             })
             .ToList();
 
@@ -93,7 +99,7 @@ public class UserData_v1
                 chatlogs.Add(entry.Id(), item);
         }
 
-        var questionnaire_entries = await _storage.Partition<QuestionnaireResultsEntity>(auth.UserId);
+        var questionnaire_entries = await tables.Partition<QuestionnaireResultsEntity>(auth.UserId);
         var questionnaires = await questionnaire_entries
             .ToAsyncEnumerable()
             .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.GetFromBlob(_questionnaires, auth.UserKey))
@@ -119,6 +125,7 @@ public class UserData_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deletion queued")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> DeleteUserData(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/user-data")] HttpRequest req,
         FunctionContext context,
@@ -135,10 +142,19 @@ public class UserData_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var target = req.GetTargetService();
+        if (target == null)
+            return new BadRequestResult();
+
         var deleteOptions = new UserDeleteOptions
         {
             UserId = auth.UserId,
-            Anonymize = anonymize ?? false
+            Anonymize = anonymize ?? false,
+            Platform = auth.Platform,
+            Target = target
         };
 
         var result = await _queue.SendMessageAsync(deleteOptions.ObjectToJson());

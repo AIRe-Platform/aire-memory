@@ -20,6 +20,7 @@ using Aire.Sdk.Platform;
 using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Queues;
 using Aire.Sdk.Azure;
+using Aire.Memory.Services;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -64,7 +65,9 @@ var host = new HostBuilder()
                 });
         });
 
-        services.AddSingleton<ITableStorageService, TableStorageService>();
+        //services.AddSingleton<ITableStorageService, TableStorageService>();
+        services.AddSingleton<ITableStorageServiceFactory, TableStorageServiceFactory>();
+        services.AddSingleton<MemoryStorageService>();
 
         services.AddSingleton<IOpenApiConfigurationOptions>(_ =>
         {
