@@ -149,17 +149,17 @@ public class ChatHistory_v1
         if (chat == null)
             return new BadRequestResult();
 
-        var entity = new ChatLogEntity(auth.UserId);
-        await entity.SaveToBlob(_chatlogs, chat, auth.UserKey);
-
         if (auth.Platform == null)
             return new BadRequestResult();
 
+        var entity = new ChatLogEntity(auth.UserId);
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var add = await tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
+
+        await entity.SaveToBlob(_chatlogs, chat, auth.UserKey);
 
         var metadata = new ChatLogMetadata
         {
