@@ -173,7 +173,8 @@ public class Document_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -183,7 +184,10 @@ public class Document_v1
         }
 
         var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        var aiDatabase = await _moduleConfigService.Get<string>(
+            auth.Platform, ModuleType.Memory, targetService,
+            ModuleSettings.Memory_VectorDbName);
+
         if (aiDatabase == null)
         {
             _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
@@ -258,7 +262,8 @@ public class Document_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var entity = await tables.RetrieveAsync<DocumentEntity>(id);
         if (entity == null)
@@ -276,7 +281,10 @@ public class Document_v1
             }
 
             var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            var aiDatabase = await _moduleConfigService.Get<string>(
+                auth.Platform, ModuleType.Memory, targetService,
+                ModuleSettings.Memory_VectorDbName);
+
             if (aiDatabase == null)
             {
                 _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);

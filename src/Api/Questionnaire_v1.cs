@@ -235,7 +235,8 @@ public class Questionnaire_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -245,14 +246,20 @@ public class Questionnaire_v1
         }
 
         var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        var aiDatabase = await _moduleConfigService.Get<string>(
+            auth.Platform, ModuleType.Memory, req.GetTargetService(),
+            ModuleSettings.Memory_VectorDbName);
+
         if (aiDatabase == null)
         {
             _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
             return new InternalServerErrorResult();
         }
 
-        int relevance = await _moduleConfigService.Get<int>(auth.Platform, ModuleSettings.Memory_VectorSearchRelevanceThreshold);
+        int relevance = await _moduleConfigService.Get<int>(
+            auth.Platform, ModuleType.Memory, targetService,
+            ModuleSettings.Memory_VectorSearchRelevanceThreshold);
+
         var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords, relevance / 100.0f);
 
@@ -358,7 +365,8 @@ public class Questionnaire_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
@@ -375,7 +383,10 @@ public class Questionnaire_v1
         }
 
         var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        var aiDatabase = await _moduleConfigService.Get<string>(
+            auth.Platform, ModuleType.Memory, targetService,
+            ModuleSettings.Memory_VectorDbName);
+
         if (aiDatabase == null)
         {
             _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
@@ -455,7 +466,8 @@ public class Questionnaire_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
@@ -465,7 +477,10 @@ public class Questionnaire_v1
         }
 
         var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+        var aiDatabase = await _moduleConfigService.Get<string>(
+            auth.Platform, ModuleType.Memory, targetService,
+            ModuleSettings.Memory_VectorDbName);
+
         if (aiDatabase == null)
         {
             _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
@@ -564,7 +579,8 @@ public class Questionnaire_v1
         if (auth.Platform == null)
             return new BadRequestResult();
 
-        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
         var entity = await tables.RetrieveAsync<QuestionnaireEntity>(id);
         if (entity == null)
@@ -589,7 +605,10 @@ public class Questionnaire_v1
             }
 
             var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-            var aiDatabase = await _moduleConfigService.Get<string>(auth.Platform, ModuleSettings.Memory_VectorDbName);
+            var aiDatabase = await _moduleConfigService.Get<string>(
+                auth.Platform, ModuleType.Memory, targetService,
+                ModuleSettings.Memory_VectorDbName);
+                
             if (aiDatabase == null)
             {
                 _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
