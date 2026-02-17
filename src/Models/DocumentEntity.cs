@@ -4,6 +4,7 @@
 
 
 using Aire.Sdk.Azure;
+using Aire.Sdk.Helpers;
 using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models;
@@ -19,6 +20,7 @@ public class DocumentEntity : BaseTableEntity
     public string? Language { get; set; }
     public string? FileName { get; set; }
     public string? Copyright { get; set; }
+    public string? Status { get; set; }
 
     public DocumentEntity()
     {
@@ -42,6 +44,7 @@ public class DocumentEntity : BaseTableEntity
         Language = metadata.Language;
         FileName = metadata.FileName;
         Copyright = metadata.Copyright;
+        Status = (metadata.Status ?? DocumentStatus.Unprocessed).ObjectToJson();
     }
 
     public DocumentMetadata ToModel()
@@ -53,6 +56,7 @@ public class DocumentEntity : BaseTableEntity
             Language = Language,
             FileName = FileName,
             Copyright = Copyright,
+            Status = Status?.JsonToObject<DocumentStatus>() ?? DocumentStatus.Processed
         };
 
         return model;
