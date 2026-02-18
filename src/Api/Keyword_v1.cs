@@ -14,61 +14,72 @@ using Microsoft.OpenApi.Models;
 using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
-using Aire.Sdk.Azure;
 using Aire.Sdk.Models.Resources;
 using InternalErrorResult = System.Web.Http.InternalServerErrorResult;
 using Aire.Memory.Helpers;
 using Aire.Sdk.Auth.Extensions;
+using Aire.Memory.Services;
+using Aire.Sdk.Platform;
 
 namespace Aire.Memory.Api;
 
-public class Keyword_v1
+public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jwt, ILogger<Keyword_v1> log)
 {
-    private readonly ITableStorageService _tables;
-    private readonly IJwtTokenService _jwt;
-    private readonly ILogger _log;
-
-    public Keyword_v1(ITableStorageService tables, IJwtTokenService jwt, ILogger<Keyword_v1> log)
-    {
-        _tables = tables;
-        _jwt = jwt;
-        _log = log;
-    }
+    private readonly MemoryStorageService _storageService = storageService;
+    private readonly IJwtTokenService _jwt = jwt;
+    private readonly ILogger _log = log;
 
     [Function("QueryKeywords_v1")]
-    [OpenApiOperation(
-        operationId: "queryKeywords",
-        tags: ["Keywords"],
-        Summary = "Query keywords")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("queryKeywords", ["Keywords"], Summary = "Query keywords")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
+    [OpenApiParameter(AirePlaformConstants.AireServiceKeyHeader,
+        In = ParameterLocation.Header,
+        Description = "Service authentication key",
+        Required = false)]
+    [OpenApiParameter(AirePlaformConstants.AireServicePlatformHeader,
+        In = ParameterLocation.Header,
+        Description = "Service authentication platform",
+        Required = false)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Keyword>), Description = "List of keyword objects")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> QueryKeywords(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/keywords")] HttpRequest req,
         FunctionContext context,
         [FromQuery] string? search)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null && !req.IsServiceRequest())
-            return new UnauthorizedResult();
-
-        bool access_stats = _jwt.CheckAuthorization(auth, AireScopes.ReadKeywords);
+        string? platform = null;
+        if (auth != null)
+        {
+            if (!_jwt.CheckAuthorization(auth, AireScopes.ReadKeywords))
+                return new ForbiddenResult();
+            platform = auth.Platform;
+        }
+        else
+        {
+            if (!req.IsServiceRequest())
+                return new UnauthorizedResult();
+            platform = req.GetServiceRequestPlatform();
+        }
 
         search = KeywordHelper.Sanitize(search);
 
-        var query = await _tables.All<KeywordValueEntity>();
+        if (platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(platform, req.GetTargetService());
+
+        var query = await tables.All<KeywordValueEntity>();
         var results = query.Where(x => x.RowKey!.Contains(search));
-        
+
         var list = results.Select(x =>
         {
             var model = x.ToModel();
-            if (!access_stats)
-                model.Stats = null;
             return model;
         });
 
@@ -76,13 +87,8 @@ public class Keyword_v1
     }
 
     [Function("GetKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "getKeyword",
-        tags: ["Keywords"],
-        Summary = "Get keyword stats")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getKeyword", ["Keywords"], Summary = "Get keyword stats")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -90,6 +96,7 @@ public class Keyword_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/keyword/{keyword}")] HttpRequest req,
         FunctionContext context,
@@ -106,8 +113,13 @@ public class Keyword_v1
         if (keyword.Length < 2)
             return new NotFoundResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         var pk = KeywordValueEntity.PartitionFromValue(keyword)!;
-        var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        var entity = await tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
 
         if (entity == null)
             return new NotFoundResult();
@@ -117,13 +129,8 @@ public class Keyword_v1
     }
 
     [Function("CreateKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "createKeyword",
-        tags: ["Keywords"],
-        Summary = "Create a keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("createKeyword", ["Keywords"], Summary = "Create a keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -131,7 +138,7 @@ public class Keyword_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Conflict, Description = "Already exists")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> CreateKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/keyword")] HttpRequest req,
@@ -145,20 +152,25 @@ public class Keyword_v1
             return new ForbiddenResult();
 
         var body = await req.ReadJson<KeywordCreateRequest>();
-        if(body == null)
+        if (body == null)
             return new BadRequestResult();
 
         string keyword = KeywordHelper.Sanitize(body.Value);
         if (keyword.Length < 2)
             return new BadRequestResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
         var pk = KeywordValueEntity.PartitionFromValue(keyword)!;
-        var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        var entity = await tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
         if (entity != null)
             return new ConflictResult();
 
         entity = new KeywordValueEntity(keyword);
-        var result = await _tables.UpsertAsync(entity);
+        var result = await tables.UpsertAsync(entity);
         if (!result)
             return new InternalErrorResult();
 
@@ -166,18 +178,13 @@ public class Keyword_v1
     }
 
     [Function("DeleteKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "deleteKeyword",
-        tags: ["Keywords"],
-        Summary = "Delete an unused keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteKeyword", ["Keywords"], Summary = "Delete an unused keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid request")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid request or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
@@ -197,7 +204,12 @@ public class Keyword_v1
         if (pk == null)
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
         if (entity == null)
             return new NotFoundResult();
 
@@ -207,18 +219,13 @@ public class Keyword_v1
             return new BadRequestResult();
         }
 
-        await _tables.DeleteAsync<KeywordValueEntity>(pk, keyword);
+        await tables.DeleteAsync<KeywordValueEntity>(pk, keyword);
         return new NoContentResult();
     }
 
     [Function("EditKeyword_v1")]
-    [OpenApiOperation(
-        operationId: "EditKeyword",
-        tags: ["Keywords"],
-        Summary = "Edit a keyword")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("EditKeyword", ["Keywords"], Summary = "Edit a keyword")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -226,7 +233,7 @@ public class Keyword_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> EditKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/keyword/{keyword}")] HttpRequest req,
@@ -239,20 +246,26 @@ public class Keyword_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
             return new ForbiddenResult();
-        
+
         var pk = KeywordValueEntity.PartitionFromValue(keyword);
         if (pk == null)
             return new BadRequestResult();
-        
+
         var body = await req.ReadJson<Keyword>();
-        if(body == null)
+        if (body == null)
             return new BadRequestResult();
 
-        var entity = await _tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var entity = await tables.RetrieveAsync<KeywordValueEntity>(pk, keyword);
+        if (entity == null)
+            return new NotFoundResult();
 
         entity = new KeywordValueEntity(body);
-
-        var result = await _tables.UpsertAsync(entity);
+        var result = await tables.UpsertAsync(entity);
         if (!result)
             return new InternalErrorResult();
 

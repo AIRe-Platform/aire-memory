@@ -12,7 +12,7 @@ namespace Aire.Memory.Models;
 /// PartitionKey: yyyyMMdd
 /// RowKey: eventName
 /// </summary>
-[EntityTable(AireConstants.Tables.Statistics)]
+[EntityTable("Statistics")]
 public class StatisticsEntity : BaseTableEntity
 {
     public int Count { get; set; }

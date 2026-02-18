@@ -10,6 +10,7 @@ public static class AireConstants
     public static class Queues
     {
         public const string UserDelete = "user-delete-queue";
+        public const string DocumentEmbed = "document-embed";
     }
 
     public static class Blobs

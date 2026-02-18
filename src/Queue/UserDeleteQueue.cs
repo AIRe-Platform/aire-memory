@@ -4,44 +4,34 @@
 
 
 using Aire.Memory.Models;
-using Aire.Sdk.Azure;
+using Aire.Memory.Services;
 using Azure.Data.Tables;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 
 namespace Aire.Memory.Queue;
 
-public class UserDeleteQueue
+public class UserDeleteQueue(MemoryStorageService storageService, ILogger<UserDeleteQueue> log)
 {
-    private readonly ITableStorageService _storage;
-    private readonly TableClient _stats;
-    private readonly ILogger<UserDeleteQueue> _log;
-
-    public UserDeleteQueue(ITableStorageService storage, TableServiceClient tableClient, ILogger<UserDeleteQueue> log)
-    {
-        _storage = storage;
-        _stats = tableClient.GetTableClient(AireConstants.Tables.Statistics);
-        _stats.CreateIfNotExists();
-        _log = log;
-    }
-
     [Function(nameof(UserDeleteQueue))]
     public async Task Run([QueueTrigger(AireConstants.Queues.UserDelete, Connection = "StorageConnectionString")] UserDeleteOptions options)
     {
-        _log.LogInformation($"Begin deleting data of user '{options.UserId}'");
+        log.LogInformation($"Begin deleting data of user '{options.UserId}'");
+
+        var storage = await storageService.GetTableStorageService(options.Platform, options.Target);
 
         // Clear chat logs
         {
-            _log.LogInformation("Searching for chat logs...");
-            var chatlogs_query = await _storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == options.UserId);
+            log.LogInformation("Searching for chat logs...");
+            var chatlogs_query = await storage.QueryAsync<ChatLogEntity>(x => x.PartitionKey == options.UserId);
             var chatlogs = await chatlogs_query.ToListAsync();
             foreach (var chat in chatlogs)
             {
-                _log.LogInformation($"Deleting chat log '{chat.RowKey}'...");
-                var delete = await _storage.DeleteAsync(chat);
+                log.LogInformation($"Deleting chat log '{chat.RowKey}'...");
+                var delete = await storage.DeleteAsync(chat);
                 if (!delete)
                 {
-                    _log.LogCritical("Failed to delete chat log {id}", chat.RowKey);
+                    log.LogCritical("Failed to delete chat log {id}", chat.RowKey);
                     throw new Exception("Failed to delete data");
                 }
             }
@@ -49,16 +39,16 @@ public class UserDeleteQueue
 
         // Clear questionnaire results
         {
-            _log.LogInformation("Searching for questionnaire results...");
-            var results_query = await _storage.QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == options.UserId);
+            log.LogInformation("Searching for questionnaire results...");
+            var results_query = await storage.QueryAsync<QuestionnaireResultsEntity>(x => x.PartitionKey == options.UserId);
             var results = await results_query.ToListAsync();
             foreach (var result in results)
             {
-                _log.LogInformation($"Deleting questionnaire result '{result.RowKey}'...");
-                var delete = await _storage.DeleteAsync(result);
+                log.LogInformation($"Deleting questionnaire result '{result.RowKey}'...");
+                var delete = await storage.DeleteAsync(result);
                 if (!delete)
                 {
-                    _log.LogCritical("Failed to delete questionnaire results {id}", result.RowKey);
+                    log.LogCritical("Failed to delete questionnaire results {id}", result.RowKey);
                     throw new Exception("Failed to delete data");
                 }
             }
@@ -67,13 +57,17 @@ public class UserDeleteQueue
         // Clear statistics if anonymization is not allowed
         if (!options.Anonymize)
         {
-            _log.LogWarning("User data anonymization is not allowed. Deleting statistics data related to the user.");
+            log.LogWarning("User data anonymization is not allowed. Deleting statistics data related to the user.");
+            var stats = await storage.GetTableClient(AireConstants.Tables.Statistics);
             string filter = $"user_id eq '{options.UserId}'";
-            await _stats
-                .QueryAsync<TableEntity>(filter)
-                .ForEachAsync(async x => await _stats.DeleteEntityAsync(x));
+            var query = stats.QueryAsync<TableEntity>(filter);
+            var queryResults = await query.ToListAsync();
+            foreach (var x in queryResults)
+            {
+                await stats.DeleteEntityAsync(x);
+            }
         }
 
-        _log.LogInformation("Tasks completed.");
+        log.LogInformation("Tasks completed.");
     }
 }

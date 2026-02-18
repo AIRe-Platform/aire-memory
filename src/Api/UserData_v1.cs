@@ -5,9 +5,10 @@
 
 using System.Net;
 using Aire.Memory.Models;
+using Aire.Memory.Services;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
-using Aire.Sdk.Azure;
+using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Helpers;
 using Aire.Sdk.Models;
 using Aire.Sdk.Models.Chat;
@@ -30,12 +31,12 @@ public class UserData_v1
     private readonly BlobContainerClient _questionnaires;
     private readonly QueueClient _queue;
     private readonly IJwtTokenService _jwt;
-    private readonly ITableStorageService _storage;
+    private readonly MemoryStorageService _storageService;
     private readonly ILogger _log;
 
     public UserData_v1(
         BlobServiceClient blobs, QueueServiceClient queues, IJwtTokenService jwt,
-        ITableStorageService storage, ILogger<UserData_v1> log)
+        MemoryStorageService storageService, ILogger<UserData_v1> log)
     {
         _chatlogs = blobs.GetBlobContainerClient(AireConstants.Blobs.ChatLogs);
         _chatlogs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
@@ -47,18 +48,13 @@ public class UserData_v1
         _queue.CreateIfNotExists();
 
         _jwt = jwt;
-        _storage = storage;
+        _storageService = storageService;
         _log = log;
     }
 
     [Function("GetUserData_v1")]
-    [OpenApiOperation(
-        operationId: "getUserData",
-        tags: ["User data"],
-        Summary = "Get all personal data collected")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("getUserData", ["User data"], Summary = "Get all personal data collected")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
@@ -81,30 +77,36 @@ public class UserData_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
 
-        var chatlogs_entries = await _storage.Partition<ChatLogEntity>(auth.UserId);
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
+
+        var chatlogs_entries = await tables.Partition<ChatLogEntity>(auth.UserId);
         var chatlogs_metadata = chatlogs_entries
             .Select(x => new ChatLogMetadata
             {
                 Id = x.Id(),
-                Time = x.Timestamp
+                Time = x.Timestamp?.UtcDateTime
             })
             .ToList();
 
         Dictionary<string, ChatLog> chatlogs = [];
-        foreach(var entry in chatlogs_entries) {
+        foreach (var entry in chatlogs_entries)
+        {
             var item = await entry.GetFromBlob(_chatlogs, auth.UserKey);
-            if(item != null)
+            if (item != null)
                 chatlogs.Add(entry.Id(), item);
         }
 
-        var questionnaire_entries = await _storage.Partition<QuestionnaireResultsEntity>(auth.UserId);
+        var questionnaire_entries = await tables.Partition<QuestionnaireResultsEntity>(auth.UserId);
         var questionnaires = await questionnaire_entries
             .ToAsyncEnumerable()
-            .SelectAwait(async x => await x.GetFromBlob(_questionnaires, auth.UserKey))
+            .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.GetFromBlob(_questionnaires, auth.UserKey))
             .Where(x => x != null)
             .ToListAsync();
 
-        var data = new GDPRDataCollection
+        var data = new GDPRMemoryDataCollection
         {
             Chats = chatlogs_metadata,
             Chatlogs = chatlogs!,
@@ -115,19 +117,15 @@ public class UserData_v1
     }
 
     [Function("DeleteUserData_v1")]
-    [OpenApiOperation(
-        operationId: "deleteUserData",
-        tags: ["User data"],
-        Summary = "Queue ALL user data for deletion (or anonymization)")]
-    [OpenApiSecurity(
-        schemeName: "bearer_auth",
-        schemeType: SecuritySchemeType.Http,
+    [OpenApiOperation("deleteUserData", ["User data"], Summary = "Queue ALL user data for deletion (or anonymization)")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deletion queued")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> DeleteUserData(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/user-data")] HttpRequest req,
         FunctionContext context,
@@ -144,10 +142,19 @@ public class UserData_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
 
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var target = req.GetTargetService();
+        if (target == null)
+            return new BadRequestResult();
+
         var deleteOptions = new UserDeleteOptions
         {
             UserId = auth.UserId,
-            Anonymize = anonymize ?? false
+            Anonymize = anonymize ?? false,
+            Platform = auth.Platform,
+            Target = target
         };
 
         var result = await _queue.SendMessageAsync(deleteOptions.ObjectToJson());
