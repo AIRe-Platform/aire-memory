@@ -16,7 +16,6 @@ using Aire.Memory.Models;
 using Aire.Sdk.AspNetCore;
 using Aire.Sdk.Auth;
 using Aire.Sdk.Models.Resources;
-using Aire.Sdk.Azure;
 using Aire.Sdk.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -26,6 +25,7 @@ using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
 using Aire.Sdk.Auth.Extensions;
+using Azure.Storage.Queues;
 
 namespace Aire.Memory.Api;
 
@@ -37,10 +37,12 @@ public class Document_v1
     private readonly IAirePlatformService _platform;
     private readonly IAireClientFactory _clientFactory;
     private readonly IAireModuleSettingsService _moduleConfigService;
+    private readonly QueueClient _documentQueue;
     private readonly ILogger _log;
 
     public Document_v1(
         BlobServiceClient blobs,
+        QueueServiceClient queues,
         MemoryStorageService storageService,
         IJwtTokenService jwt,
         IAirePlatformService platformService,
@@ -50,6 +52,9 @@ public class Document_v1
     {
         _blobs = blobs.GetBlobContainerClient(AireConstants.Blobs.Documents);
         _blobs.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
+        _documentQueue = queues.GetQueueClient(AireConstants.Queues.DocumentEmbed);
+        _documentQueue.CreateIfNotExists();
 
         _storageService = storageService;
         _jwt = jwt;
@@ -149,7 +154,7 @@ public class Document_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    public async Task<IActionResult> PostContent(
+    public async Task<IActionResult> PostDocument(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/document")] HttpRequest req,
         FunctionContext context)
     {
@@ -176,23 +181,8 @@ public class Document_v1
         var targetService = req.GetTargetService();
         var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
 
-        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
-        if (aiModule == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
-
-        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(
-            auth.Platform, ModuleType.Memory, targetService,
-            ModuleSettings.Memory_VectorDbName);
-
-        if (aiDatabase == null)
-        {
-            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
-            return new InternalServerErrorResult();
-        }
+        // Will queue the doc for processing
+        metadata.Status = DocumentStatus.Queued;
 
         // Create entity
         var file = req.Form.Files[0];
@@ -201,16 +191,6 @@ public class Document_v1
 
         // Create embedding
         var model = entity.ToModel();
-        {
-            var embedResult = await aiService.CreateDocumentEmbedding(aiDatabase, file, model);
-            var embedId = embedResult?.Ids?.FirstOrDefault();
-            if (embedId == null)
-            {
-                _log.LogCritical("Failed to create embeddings");
-                return new InternalServerErrorResult();
-            }
-            entity.EmbeddingId = embedId;
-        }
 
         // Store blob
         {
@@ -224,12 +204,88 @@ public class Document_v1
         }
 
         // Insert entity
-        var result = await tables.UpsertAsync(entity);
-        if (!result)
-            return new InternalServerErrorResult();
+        {
+            var result = await tables.UpsertAsync(entity);
+            if (!result)
+                return new InternalServerErrorResult();
+        }
 
         model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
+
+        // Queue document for processing
+
+        var embedding = new DocumentEmbedding
+        {
+            DocumentId = entity.Id(),
+            Platform = auth.Platform,
+            ServiceId = targetService
+        };
+
+        {
+            var result = await _documentQueue.SendMessageAsync(embedding.ObjectToJson());
+            _log.LogInformation($"Queued document for processing. MessageId: {result.Value.MessageId}");
+        }
+
         return new OkObjectResult(model);
+    }
+
+    [Function("ReprocessDocument_v1")]
+    [OpenApiOperation("reprocessDocument", ["Documents"], Summary = "Retry processing a document")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http,
+        Scheme = OpenApiSecuritySchemeType.Bearer,
+        BearerFormat = "JWT",
+        Description = "User token")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Requeued or already processed")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Locked, Description = "Already in progress or queued")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Document does not exist")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    public async Task<IActionResult> ReprocessDocument(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/document/{id}/reprocess")] HttpRequest req,
+        FunctionContext context,
+        string id)
+    {
+        var auth = context.Features.Get<JwtAuthFeature>();
+        if (auth == null)
+            return new UnauthorizedResult();
+
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteDocument))
+            return new ForbiddenResult();
+
+        if (auth.Platform == null)
+            return new BadRequestResult();
+
+        var targetService = req.GetTargetService();
+        var tables = await _storageService.GetTableStorageService(auth.Platform, targetService);
+
+        var entity = await tables.RetrieveAsync<DocumentEntity>(id);
+        if (entity == null)
+            return new NotFoundResult();
+
+        var model = entity.ToModel();
+        if (model.Status == DocumentStatus.Processing || model.Status == DocumentStatus.Queued)
+            return new StatusCodeResult((int)HttpStatusCode.Locked);
+
+        if (model.Status == DocumentStatus.Processed)
+            return new NoContentResult();
+
+        entity.Status = DocumentStatus.Queued.ObjectToJson();
+        await tables.UpsertAsync(entity);
+
+        var embedding = new DocumentEmbedding
+        {
+            DocumentId = entity.Id(),
+            Platform = auth.Platform,
+            ServiceId = targetService
+        };
+
+        {
+            var result = await _documentQueue.SendMessageAsync(embedding.ObjectToJson());
+            _log.LogInformation($"Queued document for processing. MessageId: {result.Value.MessageId}");
+        }
+
+        return new NoContentResult();
     }
 
     [Function("DeleteDocument_v1")]
