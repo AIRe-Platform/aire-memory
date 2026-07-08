@@ -419,10 +419,19 @@ public class Questionnaire_v1
             entity.EmbeddingId = embedId;
         }
 
-        if (questionnaire.Content == null)
-            return new BadRequestResult();
+        // Must have either an external url or content
+        if (string.IsNullOrEmpty(questionnaire.ExternalUrl))
+        {
+            if (questionnaire.Content == null)
+                return new BadRequestResult();
 
-        await entity.SaveToBlob(_questionnaires, questionnaire.Content);
+            await entity.SaveToBlob(_questionnaires, questionnaire.Content);
+        }
+        else
+        {
+            if (questionnaire.Content != null)
+                return new BadRequestResult();
+        }
 
         var add = await tables.UpsertAsync(entity);
         if (!add)
@@ -511,7 +520,21 @@ public class Questionnaire_v1
         }
 
         if (questionnaire.Content != null)
+        {
+            if (!string.IsNullOrEmpty(questionnaire.ExternalUrl))
+                return new BadRequestResult();
+
+            // Update content
             await entity.SaveToBlob(_questionnaires, questionnaire.Content);
+            entity.ExternalUrl = "";
+        }
+        else if (!string.IsNullOrEmpty(questionnaire.ExternalUrl))
+        {
+            // if the questionnaire was changed to an external URL, 
+            // make sure to erase old content
+            await entity.DeleteBlob(_questionnaires);
+            entity.ExternalUrl = questionnaire.ExternalUrl;
+        }
 
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
@@ -608,7 +631,7 @@ public class Questionnaire_v1
             var aiDatabase = await _moduleConfigService.Get<string>(
                 auth.Platform, ModuleType.Memory, targetService,
                 ModuleSettings.Memory_VectorDbName);
-                
+
             if (aiDatabase == null)
             {
                 _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
@@ -623,7 +646,7 @@ public class Questionnaire_v1
             }
         }
 
-        await _questionnaires.DeleteBlobIfExistsAsync(entity.Id());
+        await entity.DeleteBlob(_questionnaires);
 
         var delete = await tables.DeleteAsync(entity);
         if (!delete)

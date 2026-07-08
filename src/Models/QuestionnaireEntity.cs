@@ -20,6 +20,7 @@ public class QuestionnaireEntity : BaseTableEntity
     public string? Lang { get; set; }
     public string? Keywords { get; set; }
     public string? EmbeddingId { get; set; }
+    public string? ExternalUrl { get; set; }
     public bool IsFeedback { get; set; }
 
     public QuestionnaireEntity()
@@ -42,6 +43,7 @@ public class QuestionnaireEntity : BaseTableEntity
         Lang = questionnaire.Lang;
         Keywords = string.Join(",", questionnaire.Keywords!);
         IsFeedback = questionnaire.IsFeedback;
+        ExternalUrl = questionnaire.ExternalUrl;
     }
 
     public async Task<Questionnaire> ToModelAsync(BlobContainerClient client)
@@ -52,9 +54,12 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-            Content = await GetFromBlob(client),
-            IsFeedback = IsFeedback
+            IsFeedback = IsFeedback,
+            ExternalUrl = ExternalUrl
         };
+
+        if (string.IsNullOrEmpty(ExternalUrl))
+            model.Content = await GetFromBlob(client);
 
         if (Guid.TryParse(RowKey, out var id))
             model.Id = id;
@@ -64,6 +69,9 @@ public class QuestionnaireEntity : BaseTableEntity
 
     public async Task<List<QuestionnaireContent>?> GetFromBlob(BlobContainerClient client)
     {
+        if (string.IsNullOrEmpty(ExternalUrl) == false)
+            return null;
+
         var blob = client.GetBlobClient(Id());
         if (!blob.Exists())
             return null;
@@ -77,8 +85,17 @@ public class QuestionnaireEntity : BaseTableEntity
 
     public async Task SaveToBlob(BlobContainerClient client, List<QuestionnaireContent> content)
     {
+        if (content == null)
+            return;
+
         var data = BinaryData.FromString(content.ObjectToJson());
         var blob = client.GetBlobClient(Id());
         await blob.UploadAsync(data, overwrite: true);
+    }
+
+    public async Task DeleteBlob(BlobContainerClient client)
+    {
+        var blob = client.GetBlobClient(Id());
+        await blob.DeleteIfExistsAsync();
     }
 }
