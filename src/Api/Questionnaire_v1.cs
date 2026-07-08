@@ -20,7 +20,6 @@ using Aire.Sdk.Platform.Clients;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Aire.Memory.Helpers;
-using Newtonsoft.Json;
 using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
@@ -371,9 +370,6 @@ public class Questionnaire_v1
         var questionnaire = await req.ReadJson<Questionnaire>();
         if (questionnaire == null)
             return new BadRequestResult();
-
-        Console.WriteLine("Received Questionnaire:");
-        Console.WriteLine(JsonConvert.SerializeObject(questionnaire, Formatting.Indented));
 
         var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
         if (aiModule == null)
