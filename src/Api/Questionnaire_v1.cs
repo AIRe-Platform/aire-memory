@@ -24,6 +24,7 @@ using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
 using Aire.Sdk.Auth.Extensions;
+using YamlDotNet.Core.Tokens;
 
 namespace Aire.Memory.Api;
 
@@ -393,16 +394,8 @@ public class Questionnaire_v1
 
         var entity = new QuestionnaireEntity(questionnaire);
 
-        {
-            var words = await KeywordHelper.UpdateKeywords(
-                 tables,
-                 ResourceTypes.Questionnaire,
-                 entity.Id(),
-                 [],
-                 questionnaire.Keywords ?? []);
-
-            entity.Keywords = string.Join(",", words);
-        }
+        var keywords = KeywordHelper.Sanitize(questionnaire.Keywords ?? []);
+        entity.Keywords = string.Join(",", keywords);
 
         {
             var embedResult = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
@@ -432,6 +425,9 @@ public class Questionnaire_v1
         var add = await tables.UpsertAsync(entity);
         if (!add)
             return new InternalServerErrorResult();
+
+        // Update keyword index
+        await KeywordHelper.UpdateKeywords(tables, ResourceTypes.Questionnaire, entity.Id(), [], keywords);
 
         return new ObjectResult(questionnaire);
     }
@@ -501,18 +497,12 @@ public class Questionnaire_v1
         if (questionnaire.Lang != null)
             entity.Lang = questionnaire.Lang;
 
+        string[]? keywords = null;
+        var originalKeywords = entity.Keywords?.Split(",") ?? [];
         if (questionnaire.Keywords != null)
         {
-            var originalKeywords = entity.Keywords?.Split(",");
-
-            var words = await KeywordHelper.UpdateKeywords(
-                tables,
-                ResourceTypes.Questionnaire,
-                entity.Id(),
-                originalKeywords ?? [],
-                questionnaire.Keywords);
-
-            entity.Keywords = string.Join(",", words);
+            keywords = KeywordHelper.Sanitize(questionnaire.Keywords);
+            entity.Keywords = string.Join(",", keywords);
         }
 
         if (questionnaire.Content != null)
@@ -564,6 +554,13 @@ public class Questionnaire_v1
         if (!save)
             return new InternalServerErrorResult();
 
+        // Update keywords
+        if (keywords != null)
+        {
+            await KeywordHelper.UpdateKeywords(
+                tables, ResourceTypes.Questionnaire, entity.Id(), originalKeywords, keywords);
+        }
+
         return new ObjectResult(questionnaire);
     }
 
@@ -605,15 +602,6 @@ public class Questionnaire_v1
         if (entity == null)
             return new NotFoundResult();
 
-        {
-            await KeywordHelper.UpdateKeywords(
-                tables,
-                ResourceTypes.Questionnaire,
-                entity.Id(),
-                entity.Keywords?.Split(",") ?? [],
-                []);
-        }
-
         if (entity.EmbeddingId != null)
         {
             var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
@@ -647,6 +635,13 @@ public class Questionnaire_v1
         var delete = await tables.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
+
+        // Update keyword index
+        {
+            var keywords = entity.Keywords?.Split(",") ?? [];
+            await KeywordHelper.UpdateKeywords(
+                tables, ResourceTypes.Questionnaire, entity.Id(), keywords, []);
+        }
 
         return new NoContentResult();
     }

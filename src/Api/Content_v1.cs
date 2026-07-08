@@ -321,15 +321,8 @@ public class Content_v1
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
 
-        // Update keywords and add content to keyword index
-        var words = await KeywordHelper.UpdateKeywords(
-            storage,
-            ResourceTypes.Content,
-            entity.Id(),
-            [], // Assuming empty list for now
-            content.Keywords ?? []);
-
-        entity.Keywords = string.Join(",", words);
+        var keywords = KeywordHelper.Sanitize(content.Keywords ?? []);
+        entity.Keywords = string.Join(",", keywords);
 
         var model = entity.ToModel();
         {
@@ -346,11 +339,13 @@ public class Content_v1
         if (entity.Copyright != null)
             model.Copyright = entity.Copyright;
 
-
         // Insert content entity
         var result = await storage.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
+
+        // Update keyword index
+        await KeywordHelper.UpdateKeywords(storage, ResourceTypes.Content, entity.Id(), [], keywords);
 
         if (model.Type != ContentType.URL)
             model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
@@ -455,17 +450,11 @@ public class Content_v1
             entity.URI = content.Url;
         }
 
+        string[]? keywords = null;
         if (content.Keywords != null)
         {
-            // Update keywords and edit content keyword index
-            var words = await KeywordHelper.UpdateKeywords(
-                storage,
-                ResourceTypes.Content,
-                entity.Id(),
-                original.Keywords ?? [],
-                content.Keywords);
-
-            entity.Keywords = string.Join(",", words);
+            keywords = KeywordHelper.Sanitize(content.Keywords);
+            entity.Keywords = string.Join(",", keywords);
         }
 
         // Handle thumbnail upload or removal
@@ -527,6 +516,13 @@ public class Content_v1
                 return new InternalServerErrorResult();
         }
 
+        // Update keyword index
+        if (keywords != null)
+        {
+            await KeywordHelper.UpdateKeywords(
+                storage, ResourceTypes.Content, entity.Id(), original.Keywords ?? [], keywords);
+        }
+
         return new OkObjectResult(content);
     }
 
@@ -575,14 +571,6 @@ public class Content_v1
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
 
-        // Update keywords and removw content from keyword index
-        await KeywordHelper.UpdateKeywords(
-            storage,
-            ResourceTypes.Content,
-            entity.Id(),
-            content.Keywords ?? [],
-            []);
-
         if (entity.EmbeddingId != null)
         {
             var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
@@ -614,6 +602,10 @@ public class Content_v1
         var delete = await storage.DeleteAsync(entity);
         if (!delete)
             return new InternalServerErrorResult();
+
+        // Update keyword index
+        await KeywordHelper.UpdateKeywords(
+            storage, ResourceTypes.Content, entity.Id(), content.Keywords ?? [], []);
 
         return new NoContentResult();
     }
