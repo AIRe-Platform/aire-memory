@@ -24,7 +24,6 @@ using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
 using Aire.Sdk.Auth.Extensions;
-using YamlDotNet.Core.Tokens;
 
 namespace Aire.Memory.Api;
 
@@ -146,7 +145,7 @@ public class Questionnaire_v1
                 continue;
 
             var entity = await tables.RetrieveAsync<QuestionnaireEntity>(index.RowKey);
-            if (entity is null || (lang != null && entity.Lang != lang))
+            if (entity is null || (lang != null && entity.Lang != lang) || entity.IsFeedback)
                 continue;
 
             questionnaires.Add(await entity.ToModelAsync(_questionnaires));
@@ -315,19 +314,13 @@ public class Questionnaire_v1
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
-        // Retrieve all feedback questionnaires matching the IsFeedback = true condition
         var feedbackQuestionnaires = await tables.QueryAsync<QuestionnaireEntity>(q => q.IsFeedback == true);
-
-        //filter by language
         var feedbackQuestionnaire = await feedbackQuestionnaires.Where(q => q.Lang == lang).FirstOrDefaultAsync();
 
-        //if not in seleected language, then English
-        if (feedbackQuestionnaire == null)
-        {
-            feedbackQuestionnaire = await feedbackQuestionnaires
+        // Fallback to feedback questionnaires in English
+        feedbackQuestionnaire ??= await feedbackQuestionnaires
                 .Where(q => q.Lang == "en")
                 .FirstOrDefaultAsync();
-        }
 
         if (feedbackQuestionnaire == null)
             return new NotFoundResult();
@@ -372,32 +365,33 @@ public class Questionnaire_v1
         if (questionnaire == null)
             return new BadRequestResult();
 
-        var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
-        if (aiModule == null)
-        {
-            _log.LogCritical("Default AI module not configured");
-            return new InternalServerErrorResult();
-        }
-
-        var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
-        var aiDatabase = await _moduleConfigService.Get<string>(
-            auth.Platform, ModuleType.Memory, targetService,
-            ModuleSettings.Memory_VectorDbName);
-
-        if (aiDatabase == null)
-        {
-            _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
-            return new InternalServerErrorResult();
-        }
-
         questionnaire.Id = Guid.NewGuid();
-
         var entity = new QuestionnaireEntity(questionnaire);
 
         var keywords = KeywordHelper.Sanitize(questionnaire.Keywords ?? []);
         entity.Keywords = string.Join(",", keywords);
 
+        // Add questionnaires to vector index (except for feedback surveys)
+        if (!entity.IsFeedback)
         {
+            var aiModule = await _platform.GetPlatformModule(auth.Platform, ModuleType.AI, null);
+            if (aiModule == null)
+            {
+                _log.LogCritical("Default AI module not configured");
+                return new InternalServerErrorResult();
+            }
+
+            var aiService = await _clientFactory.CreateAiClient(aiModule, asService: true);
+            var aiDatabase = await _moduleConfigService.Get<string>(
+                auth.Platform, ModuleType.Memory, targetService,
+                ModuleSettings.Memory_VectorDbName);
+
+            if (aiDatabase == null)
+            {
+                _log.LogCritical("Missing '{key}' module configuration", ModuleSettings.Memory_VectorDbName);
+                return new InternalServerErrorResult();
+            }
+
             var embedResult = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
             var embedId = embedResult?.Ids?.FirstOrDefault();
             if (embedId == null)
@@ -493,7 +487,6 @@ public class Questionnaire_v1
             return new NotFoundResult();
 
         // Update entity data
-
         if (questionnaire.Lang != null)
             entity.Lang = questionnaire.Lang;
 
@@ -525,10 +518,7 @@ public class Questionnaire_v1
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
 
-        entity.IsFeedback = questionnaire.IsFeedback;
-
         // Update embedding
-
         if (entity.EmbeddingId != null)
         {
             bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);
@@ -539,17 +529,20 @@ public class Questionnaire_v1
             }
         }
 
-        var embed = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
-        var embedId = embed?.Ids?.FirstOrDefault();
-        if (embedId == null)
+        // Exclude feedback questionnaires from the vector index
+        if (!entity.IsFeedback)
         {
-            _log.LogCritical("Failed to create embeddings for the questionnaire");
-            return new InternalServerErrorResult();
+            var embed = await aiService.CreateQuestionnaireEmbedding(aiDatabase, questionnaire);
+            var embedId = embed?.Ids?.FirstOrDefault();
+            if (embedId == null)
+            {
+                _log.LogCritical("Failed to create embeddings for the questionnaire");
+                return new InternalServerErrorResult();
+            }
+            entity.EmbeddingId = embedId;
         }
-        entity.EmbeddingId = embedId;
 
         // Apply edits
-
         var save = await tables.UpsertAsync(entity);
         if (!save)
             return new InternalServerErrorResult();
