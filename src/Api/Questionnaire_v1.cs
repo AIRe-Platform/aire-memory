@@ -260,13 +260,12 @@ public class Questionnaire_v1
             ModuleSettings.Memory_VectorSearchRelevanceThreshold);
 
         var queryWords = query.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords, relevance / 100.0f);
+        var queryResponse = await aiService.QueryQuestionnaires(aiDatabase, queryWords, lang, relevance / 100.0f);
 
         if (queryResponse == null || queryResponse.Results == null)
             return new NotFoundResult();
 
         var questionnaireId = queryResponse.Results
-            .Where(x => string.IsNullOrEmpty(lang) || lang == x.Language)
             .Select(x => x.Id)
             .FirstOrDefault();
 

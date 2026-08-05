@@ -162,6 +162,7 @@ public class Content_v1
         In = ParameterLocation.Query,
         Required = true,
         Description = "List of keywords separated by commas")]
+    [OpenApiParameter("lang", In = ParameterLocation.Query, Required = false, Description = "Language filter")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Content>), Description = "List of found contents")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query or missing platform authentication")]
@@ -170,7 +171,8 @@ public class Content_v1
     public async Task<IActionResult> SearchContent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content")] HttpRequest req,
         FunctionContext context,
-        [FromQuery] string query)
+        [FromQuery] string query,
+        [FromQuery] string? lang = null)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
@@ -211,6 +213,14 @@ public class Content_v1
             {
                 _log.LogWarning($"Content '{index.RowKey}' no longer exists.");
                 continue;
+            }
+
+            if (entity.Language != lang)
+            {
+                if (entity.Language == null)
+                    _log.LogWarning($"Content '{index.RowKey}' is missing language tag.");
+                else
+                    continue;
             }
 
             var model = entity.ToModel();
@@ -284,9 +294,6 @@ public class Content_v1
         // Create entity and store blob if present
         var entity = new ContentEntity(content);
 
-        if (content.Copyright != null)
-            entity.Copyright = content.Copyright;
-
         // Iterate over form files to separate main content and thumbnail
         foreach (var file in req.Form.Files)
         {
@@ -320,7 +327,6 @@ public class Content_v1
         if (content.ThumbnailUrl == "")
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
-
         var keywords = KeywordHelper.Sanitize(content.Keywords ?? []);
         entity.Keywords = string.Join(",", keywords);
 
@@ -335,9 +341,6 @@ public class Content_v1
             }
             entity.EmbeddingId = embedId;
         }
-
-        if (entity.Copyright != null)
-            model.Copyright = entity.Copyright;
 
         // Insert content entity
         var result = await storage.UpsertAsync(entity);
@@ -428,6 +431,9 @@ public class Content_v1
 
         if (content.Description != null)
             entity.Description = content.Description;
+
+        if (content.Language != null)
+            entity.Language = content.Language;
 
         if (content.Hidden.HasValue)
             entity.Hidden = content.Hidden;
@@ -525,8 +531,6 @@ public class Content_v1
 
         return new OkObjectResult(content);
     }
-
-
 
     [Function("DeleteContent_v1")]
     [OpenApiOperation("deleteContent", ["Content"], Summary = "Delete content")]
