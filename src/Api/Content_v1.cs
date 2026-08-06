@@ -205,7 +205,7 @@ public class Content_v1
                 continue;
             }
 
-            if (entity.Language != lang)
+            if (lang != null && entity.Language != lang)
             {
                 if (entity.Language == null)
                     _log.LogWarning($"Content '{index.RowKey}' is missing language tag.");
