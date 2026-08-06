@@ -46,7 +46,6 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Keyword>), Description = "List of keyword objects")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> QueryKeywords(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/keywords")] HttpRequest req,
         FunctionContext context,
@@ -70,7 +69,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         search = KeywordHelper.Sanitize(search);
 
         if (platform == null)
-            return new BadRequestResult();
+            return new UnauthorizedResult();
 
         var tables = await _storageService.GetTableStorageService(platform, req.GetTargetService());
 
@@ -96,14 +95,13 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/keyword/{keyword}")] HttpRequest req,
         FunctionContext context,
         string keyword)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadKeywords))
@@ -112,9 +110,6 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         keyword = KeywordHelper.Sanitize(keyword);
         if (keyword.Length < 2)
             return new NotFoundResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -138,14 +133,14 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Conflict, Description = "Already exists")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> CreateKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/keyword")] HttpRequest req,
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteKeywords))
@@ -157,9 +152,6 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
 
         string keyword = KeywordHelper.Sanitize(body.Value);
         if (keyword.Length < 2)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -184,7 +176,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         BearerFormat = "JWT",
         Description = "User token")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid request or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid request")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
@@ -194,7 +186,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         string keyword)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteKeywords))
@@ -202,9 +194,6 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
 
         var pk = KeywordValueEntity.PartitionFromValue(keyword);
         if (pk == null)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -233,7 +222,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The keyword does not exist")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid keyword")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> EditKeyword(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/keyword/{keyword}")] HttpRequest req,
@@ -241,7 +230,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         string keyword)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
@@ -253,9 +242,6 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
 
         var body = await req.ReadJson<Keyword>();
         if (body == null)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());

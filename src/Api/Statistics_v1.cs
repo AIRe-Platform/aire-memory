@@ -36,7 +36,7 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
     [OpenApiParameter("eventNamePrefix", Description = "Event name filter", In = ParameterLocation.Query, Required = false)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<StatisticsEventInfo>), Description = "List of event info")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters, or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing or invalid query parameters")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetStatisticsInfo(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/stats")] HttpRequest req,
@@ -46,16 +46,13 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
         [FromQuery] string? eventNamePrefix)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadStatistics))
             return new ForbiddenResult();
 
         if (!from.HasValue)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -101,14 +98,11 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
         [FromQuery] DateTime? to)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadStatistics))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
         var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
@@ -138,7 +132,7 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
         Description = "User token")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(object), Description = "Event object")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid payload or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid payload")]
     [OpenApiResponseWithoutBody(HttpStatusCode.UnprocessableEntity, Description = "Missing required fields")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiRequestBody("application/json", typeof(object), Description = "A new event object", Required = true)]
@@ -147,7 +141,7 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteStatistics))
@@ -159,9 +153,6 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
 
         if (string.IsNullOrWhiteSpace(data.EventName) || !data.Timestamp.HasValue)
             return new UnprocessableEntityResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
         var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
@@ -201,7 +192,7 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
     [OpenApiResponseWithoutBody(HttpStatusCode.Conflict, Description = "Identifier mismatch")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiRequestBody("application/json", typeof(object), Description = "Existing event object", Required = true)]
     public async Task<IActionResult> UpdateStatisticsEvent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/stats/event/{id}")] HttpRequest req,
@@ -209,7 +200,7 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteStatistics))
@@ -217,9 +208,6 @@ public class Statistics_v1(MemoryStorageService storageService, IJwtTokenService
 
         var data = await req.ReadJson<StatisticsEvent>();
         if (data == null)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());

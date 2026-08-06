@@ -52,23 +52,20 @@ public class QuestionnaireResults_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     public async Task<IActionResult> GetQuestionnaireResults(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/questionnaire-results/{id}")] HttpRequest req,
         FunctionContext context,
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadChatHistory))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -93,7 +90,7 @@ public class QuestionnaireResults_v1
         Description = "User token")]
     [OpenApiRequestBody("application/json", typeof(QuestionnaireResults), Description = "A questionnaire results", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(QuestionnaireResults), Description = "Saved questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostQuestionnaireResults(
@@ -101,7 +98,7 @@ public class QuestionnaireResults_v1
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteChatHistory))
@@ -109,9 +106,6 @@ public class QuestionnaireResults_v1
 
         var results = await req.ReadJson<QuestionnaireResults>();
         if (results == null)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -140,7 +134,7 @@ public class QuestionnaireResults_v1
         Description = "User token")]
     [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Results not found")]
@@ -150,16 +144,13 @@ public class QuestionnaireResults_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteChatHistory))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
