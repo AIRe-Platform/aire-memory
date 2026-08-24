@@ -24,6 +24,7 @@ using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
 using Aire.Sdk.Auth.Extensions;
+using Aire.Sdk.Helpers;
 
 namespace Aire.Memory.Api;
 
@@ -466,6 +467,12 @@ public class Questionnaire_v1
         if (questionnaire.Lang != null)
             entity.Lang = questionnaire.Lang;
 
+        if (questionnaire.Name != null)
+            entity.Name = questionnaire.Name;
+
+        if (questionnaire.Privacy.HasValue)
+            entity.Privacy = questionnaire.Privacy.Value.ObjectToJson();
+
         string[]? keywords = null;
         var originalKeywords = entity.Keywords?.Split(",") ?? [];
         if (questionnaire.Keywords != null)
@@ -491,10 +498,7 @@ public class Questionnaire_v1
             entity.ExternalUrl = questionnaire.ExternalUrl;
         }
 
-        if (questionnaire.Name != null)
-            entity.Name = questionnaire.Name;
-
-        // Update embedding
+        // Delete old embedding
         if (entity.EmbeddingId != null)
         {
             bool result = await aiService.DeleteQuestionnaireEmbedding(aiDatabase, entity.EmbeddingId);

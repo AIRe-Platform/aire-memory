@@ -21,6 +21,7 @@ public class QuestionnaireEntity : BaseTableEntity
     public string? Keywords { get; set; }
     public string? EmbeddingId { get; set; }
     public string? ExternalUrl { get; set; }
+    public string? Privacy { get; set; }
     public bool IsFeedback { get; set; }
 
     public QuestionnaireEntity()
@@ -42,8 +43,11 @@ public class QuestionnaireEntity : BaseTableEntity
         Name = questionnaire.Name;
         Lang = questionnaire.Lang;
         Keywords = string.Join(",", questionnaire.Keywords!);
-        IsFeedback = questionnaire.IsFeedback;
         ExternalUrl = questionnaire.ExternalUrl;
+        Privacy = questionnaire.Privacy
+            .GetValueOrDefault(QuestionnairePrivacy.Private)
+            .ObjectToJson();
+        IsFeedback = questionnaire.IsFeedback;
     }
 
     public async Task<Questionnaire> ToModelAsync(BlobContainerClient client)
@@ -54,8 +58,11 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+            ExternalUrl = ExternalUrl,
+            Privacy = string.IsNullOrEmpty(Privacy)
+                ? QuestionnairePrivacy.Private
+                : Privacy.JsonToObject<QuestionnairePrivacy>(),
             IsFeedback = IsFeedback,
-            ExternalUrl = ExternalUrl
         };
 
         if (string.IsNullOrEmpty(ExternalUrl))
