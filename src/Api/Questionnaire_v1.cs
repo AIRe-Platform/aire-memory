@@ -24,7 +24,6 @@ using Aire.Sdk.Models.Platform;
 using Aire.Sdk.Platform;
 using Aire.Memory.Services;
 using Aire.Sdk.Auth.Extensions;
-using Aire.Sdk.Helpers;
 
 namespace Aire.Memory.Api;
 
@@ -469,9 +468,6 @@ public class Questionnaire_v1
 
         if (questionnaire.Name != null)
             entity.Name = questionnaire.Name;
-
-        if (questionnaire.Privacy.HasValue)
-            entity.Privacy = questionnaire.Privacy.Value.ObjectToJson();
 
         string[]? keywords = null;
         var originalKeywords = entity.Keywords?.Split(",") ?? [];
