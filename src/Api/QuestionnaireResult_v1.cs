@@ -219,8 +219,8 @@ public class QuestionnaireResults_v1
         Scheme = OpenApiSecuritySchemeType.Bearer,
         BearerFormat = "JWT",
         Description = "User token")]
-    [OpenApiParameter("id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
+    [OpenApiParameter("id", Description = "Questionnaire result identifier", In = ParameterLocation.Path, Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Results deleted")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
@@ -288,7 +288,7 @@ public class QuestionnaireResults_v1
         Description = "User token")]
     [OpenApiParameter("questionnaire_id", Description = "Questionnaire identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiParameter("id", Description = "Result identifier", In = ParameterLocation.Path, Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<QuestionnaireResults>), Description = "List of questionnaire results")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Results deleted")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
