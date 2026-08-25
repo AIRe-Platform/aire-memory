@@ -47,7 +47,6 @@ public class Reminders_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     [OpenApiParameter("include_active", In = ParameterLocation.Query, Type = typeof(bool), Required = false, Description = "Include already seen reminders")]
     public async Task<IActionResult> GetScheduledEvents(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/reminders")] HttpRequest req,
@@ -55,14 +54,11 @@ public class Reminders_v1
         [FromQuery(Name = "include_inactive")] bool includeInactive = false)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadReminders))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -96,21 +92,17 @@ public class Reminders_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetReminderById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/reminder/{id}")] HttpRequest req,
         FunctionContext context,
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadReminders))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -132,7 +124,7 @@ public class Reminders_v1
         Description = "User token")]
     [OpenApiRequestBody("application/json", typeof(Reminder), Description = "New reminder", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Reminder), Description = "Saved reminder")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> CreateReminder(
@@ -140,7 +132,7 @@ public class Reminders_v1
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteReminders))
@@ -153,9 +145,6 @@ public class Reminders_v1
         {
             return new BadRequestResult();
         }
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -179,7 +168,7 @@ public class Reminders_v1
     [OpenApiParameter("id", Description = "Reminder identifier", Required = true, In = ParameterLocation.Path)]
     [OpenApiRequestBody("application/json", typeof(Reminder), Description = "An event", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Reminder), Description = "Edited reminder")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
@@ -189,7 +178,7 @@ public class Reminders_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteReminders))
@@ -200,9 +189,6 @@ public class Reminders_v1
 
         var reminder = await req.ReadJson<Reminder>();
         if (reminder == null)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -232,7 +218,7 @@ public class Reminders_v1
         Description = "User token")]
     [OpenApiParameter("id", Description = "Reminder identifier", Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Success")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid id or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid id")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Not found")]
@@ -242,16 +228,13 @@ public class Reminders_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteReminders))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());

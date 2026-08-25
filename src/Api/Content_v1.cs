@@ -67,20 +67,16 @@ public class Content_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Content>), Description = "List of contents")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> GetContents(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/contents")] HttpRequest req,
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -110,7 +106,7 @@ public class Content_v1
     [OpenApiParameter("id", Description = "Content identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "A content")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> GetContentWithId(
@@ -119,16 +115,13 @@ public class Content_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
             return new ForbiddenResult();
 
         if (string.IsNullOrWhiteSpace(id))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -162,18 +155,20 @@ public class Content_v1
         In = ParameterLocation.Query,
         Required = true,
         Description = "List of keywords separated by commas")]
+    [OpenApiParameter("lang", In = ParameterLocation.Query, Required = false, Description = "Language filter")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<Content>), Description = "List of found contents")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No results")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing query")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> SearchContent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content")] HttpRequest req,
         FunctionContext context,
-        [FromQuery] string query)
+        [FromQuery] string query,
+        [FromQuery] string? lang = null)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
@@ -197,9 +192,6 @@ public class Content_v1
             return $"PartitionKey eq '{pk}'";
         }));
 
-        if (auth.Platform == null)
-            return new BadRequestResult();
-
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var queryByKeywords = await storage.QueryAsync<KeywordIndexEntity>(filter);
@@ -211,6 +203,14 @@ public class Content_v1
             {
                 _log.LogWarning($"Content '{index.RowKey}' no longer exists.");
                 continue;
+            }
+
+            if (lang != null && entity.Language != lang)
+            {
+                if (entity.Language == null)
+                    _log.LogWarning($"Content '{index.RowKey}' is missing language tag.");
+                else
+                    continue;
             }
 
             var model = entity.ToModel();
@@ -241,14 +241,11 @@ public class Content_v1
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent) || auth.Platform == null)
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var targetService = req.GetTargetService();
         var storage = await _storageService.GetTableStorageService(auth.Platform, targetService);
@@ -284,9 +281,6 @@ public class Content_v1
         // Create entity and store blob if present
         var entity = new ContentEntity(content);
 
-        if (content.Copyright != null)
-            entity.Copyright = content.Copyright;
-
         // Iterate over form files to separate main content and thumbnail
         foreach (var file in req.Form.Files)
         {
@@ -320,16 +314,8 @@ public class Content_v1
         if (content.ThumbnailUrl == "")
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
-
-        // Update keywords and add content to keyword index
-        var words = await KeywordHelper.UpdateKeywords(
-            storage,
-            ResourceTypes.Content,
-            entity.Id(),
-            [], // Assuming empty list for now
-            content.Keywords ?? []);
-
-        entity.Keywords = string.Join(",", words);
+        var keywords = KeywordHelper.Sanitize(content.Keywords ?? []);
+        entity.Keywords = string.Join(",", keywords);
 
         var model = entity.ToModel();
         {
@@ -343,14 +329,13 @@ public class Content_v1
             entity.EmbeddingId = embedId;
         }
 
-        if (entity.Copyright != null)
-            model.Copyright = entity.Copyright;
-
-
         // Insert content entity
         var result = await storage.UpsertAsync(entity);
         if (!result)
             return new InternalServerErrorResult();
+
+        // Update keyword index
+        await KeywordHelper.UpdateKeywords(storage, ResourceTypes.Content, entity.Id(), [], keywords);
 
         if (model.Type != ContentType.URL)
             model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
@@ -369,7 +354,7 @@ public class Content_v1
     [OpenApiRequestBody("application/json", typeof(Content), Description = "Content", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Content")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The Content was not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param, or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     public async Task<IActionResult> PutContent(
@@ -378,7 +363,7 @@ public class Content_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteContent) || auth.Platform == null)
@@ -393,9 +378,6 @@ public class Content_v1
             _log.LogCritical("Default AI module not configured");
             return new InternalServerErrorResult();
         }
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var targetService = req.GetTargetService();
         var storage = await _storageService.GetTableStorageService(auth.Platform, targetService);
@@ -434,6 +416,9 @@ public class Content_v1
         if (content.Description != null)
             entity.Description = content.Description;
 
+        if (content.Language != null)
+            entity.Language = content.Language;
+
         if (content.Hidden.HasValue)
             entity.Hidden = content.Hidden;
 
@@ -455,17 +440,11 @@ public class Content_v1
             entity.URI = content.Url;
         }
 
+        string[]? keywords = null;
         if (content.Keywords != null)
         {
-            // Update keywords and edit content keyword index
-            var words = await KeywordHelper.UpdateKeywords(
-                storage,
-                ResourceTypes.Content,
-                entity.Id(),
-                original.Keywords ?? [],
-                content.Keywords);
-
-            entity.Keywords = string.Join(",", words);
+            keywords = KeywordHelper.Sanitize(content.Keywords);
+            entity.Keywords = string.Join(",", keywords);
         }
 
         // Handle thumbnail upload or removal
@@ -527,10 +506,15 @@ public class Content_v1
                 return new InternalServerErrorResult();
         }
 
+        // Update keyword index
+        if (keywords != null)
+        {
+            await KeywordHelper.UpdateKeywords(
+                storage, ResourceTypes.Content, entity.Id(), original.Keywords ?? [], keywords);
+        }
+
         return new OkObjectResult(content);
     }
-
-
 
     [Function("DeleteContent_v1")]
     [OpenApiOperation("deleteContent", ["Content"], Summary = "Delete content")]
@@ -541,7 +525,7 @@ public class Content_v1
     [OpenApiParameter("id", Description = "Content identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Operation was successful")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid parameter")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> DeleteContent(
@@ -550,16 +534,13 @@ public class Content_v1
         string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeleteContent) || auth.Platform == null)
             return new ForbiddenResult();
 
         if (!Guid.TryParse(id, out Guid _))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var targetService = req.GetTargetService();
@@ -574,14 +555,6 @@ public class Content_v1
         {
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
-
-        // Update keywords and removw content from keyword index
-        await KeywordHelper.UpdateKeywords(
-            storage,
-            ResourceTypes.Content,
-            entity.Id(),
-            content.Keywords ?? [],
-            []);
 
         if (entity.EmbeddingId != null)
         {
@@ -615,6 +588,10 @@ public class Content_v1
         if (!delete)
             return new InternalServerErrorResult();
 
+        // Update keyword index
+        await KeywordHelper.UpdateKeywords(
+            storage, ResourceTypes.Content, entity.Id(), content.Keywords ?? [], []);
+
         return new NoContentResult();
     }
 
@@ -630,7 +607,7 @@ public class Content_v1
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ContentRating), Description = "Content rating entity")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param, or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     public async Task<IActionResult> GetContentRatingVote(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/content/{id}/rating")] HttpRequest req,
@@ -638,16 +615,13 @@ public class Content_v1
             string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
             return new ForbiddenResult();
 
         if (!Guid.TryParse(id, out Guid _))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -673,7 +647,7 @@ public class Content_v1
     [OpenApiRequestBody("application/json", typeof(ContentRating), Description = "Content rating", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Updated content model")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Content was not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param, or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostContentRatingVote(
@@ -682,7 +656,7 @@ public class Content_v1
             string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.RateContent))
@@ -693,9 +667,6 @@ public class Content_v1
 
         var rating = await req.ReadJson<ContentRating>();
         if (rating == null || !rating.Vote.HasValue)
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
@@ -752,7 +723,7 @@ public class Content_v1
     [OpenApiParameter("id", Description = "Content identifier", Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "Updated content model")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "Content was not found")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param, or missing platform authentication")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     public async Task<IActionResult> PostContentView(
@@ -761,16 +732,13 @@ public class Content_v1
             string id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.ReadContent))
             return new UnauthorizedResult();
 
         if (!Guid.TryParse(id, out Guid _))
-            return new BadRequestResult();
-
-        if (auth.Platform == null)
             return new BadRequestResult();
 
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());

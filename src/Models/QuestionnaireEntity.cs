@@ -20,6 +20,8 @@ public class QuestionnaireEntity : BaseTableEntity
     public string? Lang { get; set; }
     public string? Keywords { get; set; }
     public string? EmbeddingId { get; set; }
+    public string? ExternalUrl { get; set; }
+    public string? Privacy { get; set; }
     public bool IsFeedback { get; set; }
 
     public QuestionnaireEntity()
@@ -41,6 +43,10 @@ public class QuestionnaireEntity : BaseTableEntity
         Name = questionnaire.Name;
         Lang = questionnaire.Lang;
         Keywords = string.Join(",", questionnaire.Keywords!);
+        ExternalUrl = questionnaire.ExternalUrl;
+        Privacy = questionnaire.Privacy
+            .GetValueOrDefault(QuestionnairePrivacy.Private)
+            .ObjectToJson();
         IsFeedback = questionnaire.IsFeedback;
     }
 
@@ -52,9 +58,15 @@ public class QuestionnaireEntity : BaseTableEntity
             Lang = Lang,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Keywords = Keywords?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
-            Content = await GetFromBlob(client),
-            IsFeedback = IsFeedback
+            ExternalUrl = ExternalUrl,
+            Privacy = string.IsNullOrEmpty(Privacy)
+                ? QuestionnairePrivacy.Private
+                : Privacy.JsonToObject<QuestionnairePrivacy>(),
+            IsFeedback = IsFeedback,
         };
+
+        if (string.IsNullOrEmpty(ExternalUrl))
+            model.Content = await GetFromBlob(client);
 
         if (Guid.TryParse(RowKey, out var id))
             model.Id = id;
@@ -64,6 +76,9 @@ public class QuestionnaireEntity : BaseTableEntity
 
     public async Task<List<QuestionnaireContent>?> GetFromBlob(BlobContainerClient client)
     {
+        if (string.IsNullOrEmpty(ExternalUrl) == false)
+            return null;
+
         var blob = client.GetBlobClient(Id());
         if (!blob.Exists())
             return null;
@@ -77,8 +92,17 @@ public class QuestionnaireEntity : BaseTableEntity
 
     public async Task SaveToBlob(BlobContainerClient client, List<QuestionnaireContent> content)
     {
+        if (content == null)
+            return;
+
         var data = BinaryData.FromString(content.ObjectToJson());
         var blob = client.GetBlobClient(Id());
         await blob.UploadAsync(data, overwrite: true);
+    }
+
+    public async Task DeleteBlob(BlobContainerClient client)
+    {
+        var blob = client.GetBlobClient(Id());
+        await blob.DeleteIfExistsAsync();
     }
 }
