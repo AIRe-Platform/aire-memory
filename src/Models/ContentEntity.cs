@@ -17,6 +17,7 @@ public class ContentEntity : BaseTableEntity
 {
     public string? Name { get; set; }
     public string? Description { get; set; }
+    public string? Language { get; set; }
     public bool? Hidden { get; set; }
     public string? Type { get; set; }
     public int Views { get; set; }
@@ -51,6 +52,7 @@ public class ContentEntity : BaseTableEntity
 
         Name = content.Name;
         Description = content.Description;
+        Language = content.Language;
         Hidden = content.Hidden;
         Type = content.Type.ObjectToJson();
         Views = content.Views;
@@ -78,6 +80,7 @@ public class ContentEntity : BaseTableEntity
             Id = Guid.Parse(Id()),
             Name = Name,
             Description = Description,
+            Language = Language,
             Modified = Timestamp.HasValue ? Timestamp.Value.UtcDateTime : DateTime.UtcNow,
             Hidden = Hidden,
             Type = Type?.JsonToObject<ContentType>(),

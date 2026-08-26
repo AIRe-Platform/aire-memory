@@ -18,6 +18,7 @@ public static class AireConstants
         public const string ChatLogs = "chatlogs";
         public const string Questionnaires = "questionnaires";
         public const string QuestionnaireResults = "questionnaire-results";
+        public const string PublicQuestionnaireResults = "pub-questionnaire-results";
         public const string Contents = "contents";
         public const string Reminders = "reminders";
         public const string Documents = "documents";

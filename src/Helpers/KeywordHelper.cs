@@ -30,7 +30,7 @@ public static class KeywordHelper
             .ToArray();
     }
 
-    public static async Task<List<string>> UpdateKeywords(
+    public static async Task UpdateKeywords(
         ITableStorageService storage,
         string resourceType,
         string resourceId,
@@ -97,7 +97,5 @@ public static class KeywordHelper
             var indexEntity = new KeywordIndexEntity(resourceType, resourceId, keyword);
             await storage.UpsertAsync(indexEntity);
         }
-
-        return [.. newSanitized];
     }
 }

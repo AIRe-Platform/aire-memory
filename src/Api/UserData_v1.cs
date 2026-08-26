@@ -66,7 +66,7 @@ public class UserData_v1
         FunctionContext context)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         var requiredScopes = new AireScopes([
@@ -76,9 +76,6 @@ public class UserData_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
@@ -125,14 +122,13 @@ public class UserData_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deletion queued")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing platform authentication")]
     public async Task<IActionResult> DeleteUserData(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/user-data")] HttpRequest req,
         FunctionContext context,
         [FromQuery] bool? anonymize)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
-        if (auth == null)
+        if (auth?.Platform == null)
             return new UnauthorizedResult();
 
         var requiredScopes = new AireScopes([
@@ -141,9 +137,6 @@ public class UserData_v1
 
         if (!_jwt.CheckAuthorization(auth, requiredScopes: requiredScopes))
             return new ForbiddenResult();
-
-        if (auth.Platform == null)
-            return new BadRequestResult();
 
         var target = req.GetTargetService();
         if (target == null)
