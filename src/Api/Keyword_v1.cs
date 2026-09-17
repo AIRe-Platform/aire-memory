@@ -233,7 +233,7 @@ public class Keyword_v1(MemoryStorageService storageService, IJwtTokenService jw
         if (auth?.Platform == null)
             return new UnauthorizedResult();
 
-        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.Keywords))
+        if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.WriteKeywords))
             return new ForbiddenResult();
 
         var pk = KeywordValueEntity.PartitionFromValue(keyword);
