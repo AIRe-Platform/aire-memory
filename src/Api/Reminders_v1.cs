@@ -146,6 +146,9 @@ public class Reminders_v1
             return new BadRequestResult();
         }
 
+        // Ensure fresh reminder ID
+        reminder.Id = Guid.NewGuid();
+
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var entity = new ReminderEntity(reminder, auth.UserId);
