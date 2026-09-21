@@ -242,6 +242,8 @@ public class Content_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.UnprocessableEntity, Description = "Invalid content type")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.RequestEntityTooLarge, Description = "Uploaded content is too large")]
     public async Task<IActionResult> PostContent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/content")] HttpRequest req,
         FunctionContext context)
@@ -288,37 +290,43 @@ public class Content_v1
         var entity = new ContentEntity(content);
 
         // Iterate over form files to separate main content and thumbnail
-        foreach (var file in req.Form.Files)
+        if (req.Form.Files.Count > 0)
         {
-            using var stream = file.OpenReadStream();
+            var thumbnail = req.Form.Files.FirstOrDefault(x => x.Name == "thumbnail");
+            var blob = req.Form.Files.FirstOrDefault(x => x.Name != "thumbnail");
+            // Ignore extra files
 
-            if (file.Name == "thumbnail")
+            if (thumbnail != null)
             {
-                // Handle thumbnail upload by creating a temporary collection
-                var thumbnailCollection = new FormFileCollection { file };
-                content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(thumbnailCollection, _blobs, entity.Id());
-                entity.ThumbnailFileName = file.FileName;
+                if (thumbnail.Length > AireConstants.Limits.ThumbnailSizeLimit)
+                    return new StatusCodeResult((int)HttpStatusCode.RequestEntityTooLarge);
+
+                entity.ThumbnailFileName = thumbnail.FileName;
+                content.ThumbnailUrl = await BlobHelper.UploadThumbnail(thumbnail, _blobs, entity.Id());
             }
-            else
-            {
-                // Handle main content file upload if the content type is blob-based
-                if (content.Type.IsBlobType())
-                {
-                    entity.FileName = file.FileName;
 
-                    var blobClient = _blobs.GetBlobClient(entity.Id());
-                    var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
-                    await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
-                }
-                else if (string.IsNullOrEmpty(content.Url))
-                {
+            if (blob != null)
+            {
+                if (!content.Type.IsBlobType())
                     return new BadRequestResult();
-                }
+
+                if (!BlobHelper.IsValidContentType(content.Type.Value, blob))
+                    return new UnprocessableEntityResult();
+
+                // Handle main content file upload if the content type is blob-based
+                if (blob.Length > AireConstants.Limits.ContentSizeLimit)
+                    return new StatusCodeResult((int)HttpStatusCode.RequestEntityTooLarge);
+
+                entity.FileName = blob.FileName;
+                content.Url = await BlobHelper.UploadBlobAsync(blob, _blobs, entity.Id());
             }
         }
 
-        if (content.ThumbnailUrl == "")
-            await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
+        // Either just uploaded blob url or url provided with content required
+        if (string.IsNullOrEmpty(content.Url))
+        {
+            return new BadRequestResult();
+        }
 
         var keywords = KeywordHelper.Sanitize(content.Keywords ?? []);
         entity.Keywords = string.Join(",", keywords);
@@ -363,6 +371,8 @@ public class Content_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body or param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.UnprocessableEntity, Description = "Invalid content type")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.RequestEntityTooLarge, Description = "Uploaded content is too large")]
     public async Task<IActionResult> PutContent(
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/content/{id}")] HttpRequest req,
         FunctionContext context,
@@ -453,34 +463,47 @@ public class Content_v1
             entity.Keywords = string.Join(",", keywords);
         }
 
-        // Delete existing thumbnail if URL set to empty
+        // Handle uploads
+        if (req.Form.Files.Count > 0)
+        {
+            var thumbnail = req.Form.Files.FirstOrDefault(x => x.Name == "thumbnail");
+            var blob = req.Form.Files.FirstOrDefault(x => x.Name != "thumbnail");
+            // Ignore any extra files
+
+            if (thumbnail != null)
+            {
+                if (thumbnail.Length > AireConstants.Limits.ThumbnailSizeLimit)
+                    return new StatusCodeResult((int)HttpStatusCode.RequestEntityTooLarge);
+
+                await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
+
+                entity.ThumbnailFileName = thumbnail.FileName;
+                content.ThumbnailFileName = await BlobHelper.UploadThumbnail(thumbnail, _blobs, entity.Id());
+            }
+
+            if (blob != null)
+            {
+                if (!content.Type.HasValue || !content.Type.IsBlobType())
+                    return new BadRequestResult();
+
+                if (!BlobHelper.IsValidContentType(content.Type.Value, blob))
+                    return new UnprocessableEntityResult();
+
+                if (blob.Length > AireConstants.Limits.ContentSizeLimit)
+                    return new StatusCodeResult((int)HttpStatusCode.RequestEntityTooLarge);
+
+                await _blobs.DeleteBlobIfExistsAsync(entity.Id());
+
+                entity.FileName = blob.FileName;
+                await BlobHelper.UploadBlobAsync(blob, _blobs, entity.Id());
+            }
+        }
+
+        // Delete existing thumbnail if URL set to empty (no new thumbnail uploaded)
         if (content.ThumbnailUrl == "")
         {
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
             entity.ThumbnailFileName = "";
-        }
-
-        // Upload new thubnail if present in the form
-        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
-
-        // Handle other blobs if any
-        if (req.Form.Files.Count > 0)
-        {
-            foreach (var file in req.Form.Files)
-            {
-                if (file.Name != "thumbnail")
-                {
-                    entity.FileName = file.FileName;
-                    // Upload main content file to blob storage
-                    var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
-                    using var stream = file.OpenReadStream();
-
-                    var blobClient = _blobs.GetBlobClient(entity.Id());
-                    await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
-                }
-                else
-                    entity.ThumbnailFileName = file.FileName; // Apply thumbnail filename if present
-            }
         }
 
         // Update embedding
@@ -561,6 +584,8 @@ public class Content_v1
         {
             await _blobs.DeleteBlobIfExistsAsync(entity.Id());
         }
+
+        await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
 
         if (entity.EmbeddingId != null)
         {
