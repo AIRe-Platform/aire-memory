@@ -105,7 +105,7 @@ public class Content_v1
         Description = "User token")]
     [OpenApiParameter("id", Description = "Content identifier", In = ParameterLocation.Path, Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Content), Description = "A content")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The content was not found or is hidden")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid param")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
@@ -124,14 +124,14 @@ public class Content_v1
         if (string.IsNullOrWhiteSpace(id))
             return new BadRequestResult();
 
+        bool showHidden = _jwt.CheckAuthorization(auth, AireScopes.WriteContent);
         var storage = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
 
         var entity = await storage.RetrieveAsync<ContentEntity>(id);
-        if (entity == null)
+        if (entity == null || (entity.Hidden == true && !showHidden))
             return new NotFoundResult();
 
         var model = entity.ToModel();
-
         if (model.Type.IsBlobType())
         {
             model.Url = SasHelper.GenerateSasUriString(_blobs, entity.Id());
@@ -211,6 +211,12 @@ public class Content_v1
                     _log.LogWarning($"Content '{index.RowKey}' is missing language tag.");
                 else
                     continue;
+            }
+
+            if (entity.Hidden == true)
+            {
+                // Skip hidden content
+                continue;
             }
 
             var model = entity.ToModel();
