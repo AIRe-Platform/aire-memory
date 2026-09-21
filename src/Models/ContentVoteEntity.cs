@@ -4,6 +4,7 @@
 
 
 using Aire.Sdk.Azure;
+using Aire.Sdk.Models.Resources;
 
 namespace Aire.Memory.Models;
 
@@ -16,11 +17,20 @@ public class ContentVoteEntity : BaseTableEntity
 {
     public int Value { get; set; }
 
-    public ContentVoteEntity() {}
+    public ContentVoteEntity() { }
     public ContentVoteEntity(string userId, string contentId, int value = 0)
     {
         PartitionKey = userId;
         RowKey = contentId;
         Value = value;
+    }
+
+    public ContentVote ToModel()
+    {
+        return new ContentVote
+        {
+            ContentId = RowKey,
+            Score = Value
+        };
     }
 }

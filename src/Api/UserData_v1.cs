@@ -4,6 +4,7 @@
 
 
 using System.Net;
+using Aire.Memory.Helpers;
 using Aire.Memory.Models;
 using Aire.Memory.Services;
 using Aire.Sdk.AspNetCore;
@@ -12,6 +13,8 @@ using Aire.Sdk.Auth.Extensions;
 using Aire.Sdk.Helpers;
 using Aire.Sdk.Models;
 using Aire.Sdk.Models.Chat;
+using Aire.Sdk.Models.Resources;
+using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Queues;
@@ -29,6 +32,8 @@ public class UserData_v1
 {
     private readonly BlobContainerClient _chatlogs;
     private readonly BlobContainerClient _questionnaires;
+    private readonly BlobContainerClient _pub_questionnaires;
+    private readonly BlobContainerClient _reminders;
     private readonly QueueClient _queue;
     private readonly IJwtTokenService _jwt;
     private readonly MemoryStorageService _storageService;
@@ -43,6 +48,12 @@ public class UserData_v1
 
         _questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.QuestionnaireResults);
         _questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
+        _pub_questionnaires = blobs.GetBlobContainerClient(AireConstants.Blobs.PublicQuestionnaireResults);
+        _pub_questionnaires.CreateIfNotExists(publicAccessType: PublicAccessType.None);
+
+        _reminders = blobs.GetBlobContainerClient(AireConstants.Blobs.Reminders);
+        _reminders.CreateIfNotExists(publicAccessType: PublicAccessType.None);
 
         _queue = queues.GetQueueClient(AireConstants.Queues.UserDelete);
         _queue.CreateIfNotExists();
@@ -103,11 +114,40 @@ public class UserData_v1
             .Where(x => x != null)
             .ToListAsync();
 
+        var pub_questionnaire_entries = await tables.QueryAsync<QuestionnairePublicResultsEntity>(x => x.UserId == auth.UserId);
+        var pub_questionnaires = await questionnaire_entries
+            .ToAsyncEnumerable()
+            .Select(async (QuestionnaireResultsEntity x, CancellationToken ct) => await x.GetFromBlob(_questionnaires, auth.UserKey))
+            .Where(x => x != null)
+            .ToListAsync();
+
+        var reminder_entries = await tables.Partition<ReminderEntity>(auth.UserId);
+        List<Reminder> reminders = [];
+        foreach (var entry in reminder_entries)
+        {
+            var content = await entry.GetContentFromBlob(_reminders, auth.UserKey);
+            var item = entry.ToModel();
+            item.Content = content;
+            reminders.Add(item);
+        }
+
+        var content_vote_entries = await tables.Partition<ContentVoteEntity>(auth.UserId);
+        var content_votes = content_vote_entries.Select(x => x.ToModel()).ToList();
+
+        var stats = await tables.GetTableClient(AireConstants.Tables.Statistics);
+        string stats_filter = $"user_id eq '{auth.UserId}'";
+        var stats_query = await stats.QueryAsync<TableEntity>(stats_filter).ToListAsync();
+        var stats_events = stats_query.Select(StatisticsHelper.EventEntityToModel).ToList();
+
         var data = new GDPRMemoryDataCollection
         {
             Chats = chatlogs_metadata,
             Chatlogs = chatlogs!,
-            Questionnaires = questionnaires!
+            Questionnaires = questionnaires!,
+            PublicQuestionnaires = pub_questionnaires!,
+            Reminders = reminders,
+            ContentVotes = content_votes,
+            Statistics = stats_events
         };
 
         return new OkObjectResult(data);
@@ -122,6 +162,7 @@ public class UserData_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deletion queued")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Missing target service header")]
     public async Task<IActionResult> DeleteUserData(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/user-data")] HttpRequest req,
         FunctionContext context,
