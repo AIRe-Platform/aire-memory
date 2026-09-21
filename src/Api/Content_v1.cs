@@ -447,15 +447,15 @@ public class Content_v1
             entity.Keywords = string.Join(",", keywords);
         }
 
-        // Handle thumbnail upload or removal
-        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
-
+        // Delete existing thumbnail if URL set to empty
         if (content.ThumbnailUrl == "")
         {
             await BlobHelper.RemoveThumbnailIfExists(_blobs, entity.Id());
             entity.ThumbnailFileName = "";
         }
 
+        // Upload new thubnail if present in the form
+        content.ThumbnailUrl = await BlobHelper.UploadThumbnailIfPresent(formData.Files, _blobs, entity.Id());
 
         // Handle other blobs if any
         if (req.Form.Files.Count > 0)
@@ -473,7 +473,7 @@ public class Content_v1
                     await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
                 }
                 else
-                    entity.ThumbnailFileName = file.FileName;
+                    entity.ThumbnailFileName = file.FileName; // Apply thumbnail filename if present
             }
         }
 
