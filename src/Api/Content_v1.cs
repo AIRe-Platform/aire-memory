@@ -489,7 +489,7 @@ public class Content_v1
                 }
             }
 
-            var embed = await aiService.CreateContentEmbedding(aiDatabase, content);
+            var embed = await aiService.CreateContentEmbedding(aiDatabase, entity.ToModel());
             var embedId = embed?.Ids?.FirstOrDefault();
             if (embedId == null)
             {
@@ -513,7 +513,7 @@ public class Content_v1
                 storage, ResourceTypes.Content, entity.Id(), original.Keywords ?? [], keywords);
         }
 
-        return new OkObjectResult(content);
+        return new OkObjectResult(entity.ToModel());
     }
 
     [Function("DeleteContent_v1")]

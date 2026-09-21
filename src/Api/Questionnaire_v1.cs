@@ -505,6 +505,16 @@ public class Questionnaire_v1
             }
         }
 
+        // Apply edits
+        {
+            var save = await tables.UpsertAsync(entity);
+            if (!save)
+                return new InternalServerErrorResult();
+        }
+
+        // Update model
+        questionnaire = await entity.ToModelAsync(_questionnaires);
+
         // Exclude feedback questionnaires from the vector index
         if (!entity.IsFeedback)
         {
@@ -515,13 +525,14 @@ public class Questionnaire_v1
                 _log.LogCritical("Failed to create embeddings for the questionnaire");
                 return new InternalServerErrorResult();
             }
-            entity.EmbeddingId = embedId;
-        }
 
-        // Apply edits
-        var save = await tables.UpsertAsync(entity);
-        if (!save)
-            return new InternalServerErrorResult();
+            entity.EmbeddingId = embedId;
+
+            // Apply new embedding ID
+            var save = await tables.UpsertAsync(entity);
+            if (!save)
+                return new InternalServerErrorResult();
+        }
 
         // Update keywords
         if (keywords != null)
