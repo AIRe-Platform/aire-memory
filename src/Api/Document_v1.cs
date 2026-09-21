@@ -180,7 +180,7 @@ public class Document_v1
         var file = req.Form.Files[0];
         var entity = new DocumentEntity(metadata);
 
-        if (!BlobHelper.IsValidContentType(ContentType.Document, file))
+        if (!ContentHelper.IsValidContentType(ContentType.Document, file))
             return new UnprocessableEntityResult();
 
         if (file.Length > AireConstants.Limits.DocumentSizeLimit)

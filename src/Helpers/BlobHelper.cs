@@ -2,13 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-using Aire.Sdk.Models.Resources;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Http;
-using System.Net.Mime;
-
-using ContentType = Aire.Sdk.Models.Resources.ContentType;
 
 namespace Aire.Memory.Helpers;
 
@@ -54,39 +50,5 @@ public static class BlobHelper
         var blobHttpHeader = new BlobHttpHeaders { ContentType = contentType };
         await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         return blobClient.Uri.ToString();
-    }
-
-    public static bool IsValidThumbnailContentType(IFormFile file)
-    {
-        return IsValidContentType(ContentType.Image, file);
-    }
-
-    public static bool IsValidContentType(ContentType type, IFormFile file)
-    {
-        if (type == ContentType.URL)
-            return false;
-
-        if (type == ContentType.Image)
-        {
-            return file.ContentType.StartsWith("image/");
-        }
-
-        if (type == ContentType.Video)
-        {
-            return file.ContentType.StartsWith("video/");
-        }
-
-        if (type == ContentType.Document)
-        {
-            string[] docTypes = [
-                "text/markdown",
-                "text/plain",
-                "application/pdf",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ];
-            return docTypes.Contains(file.ContentType);
-        }
-
-        return false;
     }
 }

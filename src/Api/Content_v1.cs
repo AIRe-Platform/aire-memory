@@ -310,7 +310,7 @@ public class Content_v1
                 if (!content.Type.IsBlobType())
                     return new BadRequestResult();
 
-                if (!BlobHelper.IsValidContentType(content.Type.Value, blob))
+                if (!ContentHelper.IsValidContentType(content.Type.Value, blob))
                     return new UnprocessableEntityResult();
 
                 // Handle main content file upload if the content type is blob-based
@@ -323,7 +323,7 @@ public class Content_v1
         }
 
         // Either just uploaded blob url or url provided with content required
-        if (string.IsNullOrEmpty(content.Url))
+        if (string.IsNullOrEmpty(content.Url) || !ContentHelper.IsValidContentUrl(content.Url))
         {
             return new BadRequestResult();
         }
@@ -453,6 +453,9 @@ public class Content_v1
 
         if (content.Type == ContentType.URL && !string.IsNullOrEmpty(content.Url))
         {
+            if (!ContentHelper.IsValidContentUrl(content.Url))
+                return new BadRequestResult();
+
             entity.URI = content.Url;
         }
 
@@ -486,7 +489,7 @@ public class Content_v1
                 if (!content.Type.HasValue || !content.Type.IsBlobType())
                     return new BadRequestResult();
 
-                if (!BlobHelper.IsValidContentType(content.Type.Value, blob))
+                if (!ContentHelper.IsValidContentType(content.Type.Value, blob))
                     return new UnprocessableEntityResult();
 
                 if (blob.Length > AireConstants.Limits.ContentSizeLimit)
