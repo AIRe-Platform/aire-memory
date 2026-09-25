@@ -28,4 +28,11 @@ public static class AireConstants
     {
         public const string Statistics = "Statistics";
     }
+
+    public static class Limits
+    {
+        public const long ThumbnailSizeLimit = 2 * 1000 * 1000; // 2 MB limit
+        public const long DocumentSizeLimit = 5 * 1000 * 1000; // 5 MB limit
+        public const long ContentSizeLimit = 50 * 1000 * 1000; // 50 MB limit
+    }
 }

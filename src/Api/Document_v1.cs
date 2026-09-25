@@ -147,6 +147,8 @@ public class Document_v1
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "Invalid body")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Missing or insufficient authorization")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Forbidden, Description = "Access denied")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.UnprocessableEntity, Description = "Invalid document type")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.RequestEntityTooLarge, Description = "Document is too large")]
     public async Task<IActionResult> PostDocument(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/document")] HttpRequest req,
         FunctionContext context)
@@ -177,21 +179,20 @@ public class Document_v1
         // Create entity
         var file = req.Form.Files[0];
         var entity = new DocumentEntity(metadata);
+
+        if (!ContentHelper.IsValidContentType(ContentType.Document, file))
+            return new UnprocessableEntityResult();
+
+        if (file.Length > AireConstants.Limits.DocumentSizeLimit)
+            return new StatusCodeResult((int)HttpStatusCode.RequestEntityTooLarge);
+
         entity.FileName ??= file.FileName;
 
         // Create embedding
         var model = entity.ToModel();
 
         // Store blob
-        {
-            using var stream = file.OpenReadStream();
-            var blobClient = _blobs.GetBlobClient(entity.Id());
-            var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
-            await blobClient.UploadAsync(stream, new BlobUploadOptions
-            {
-                HttpHeaders = blobHttpHeader
-            });
-        }
+        await BlobHelper.UploadBlobAsync(file, _blobs, entity.Id());
 
         // Insert entity
         {

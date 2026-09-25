@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 
+using Aire.Memory.Helpers;
 using Aire.Sdk.Azure;
 using Aire.Sdk.Models.Statistics;
 
@@ -26,7 +27,7 @@ public class StatisticsEntity : BaseTableEntity
     public StatisticsEntity(string eventName)
     {
         PartitionKey = DateTime.UtcNow.ToString("yyyyMMdd");
-        RowKey = eventName;
+        RowKey = StatisticsHelper.EscapeEventName(eventName);
     }
 
     public static string CreateFilter(DateTime from, DateTime? to = null, string? eventNamePrefix = null)
@@ -39,9 +40,10 @@ public class StatisticsEntity : BaseTableEntity
 
         if (!string.IsNullOrWhiteSpace(eventNamePrefix))
         {
-            char last = (char)(eventNamePrefix.Last() + 1);
-            string end = eventNamePrefix[..^1] + last;
-            filters.Add($"RowKey ge '{eventNamePrefix}' and RowKey lt '{end}'");
+            string prefix = StatisticsHelper.EscapeEventName(eventNamePrefix);
+            char last = (char)(prefix.Last() + 1);
+            string end = prefix[..^1] + last;
+            filters.Add($"RowKey ge '{prefix}' and RowKey lt '{end}'");
         }
 
         return string.Join(" and ", filters);
@@ -49,7 +51,7 @@ public class StatisticsEntity : BaseTableEntity
 
     public static (string pk, string rk) CreateTableKeys(DateTime date, string eventName)
     {
-        return ($"{date:yyyyMMdd}", eventName);
+        return ($"{date:yyyyMMdd}", StatisticsHelper.EscapeEventName(eventName));
     }
 
     public StatisticsEventInfo ToModel()

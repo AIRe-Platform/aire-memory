@@ -297,7 +297,7 @@ public class QuestionnaireResults_v1
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/questionnaire-results/{questionnaire_id}/public/{result_id}")] HttpRequest req,
         FunctionContext context,
         string questionnaire_id,
-        string id)
+        string result_id)
     {
         var auth = context.Features.Get<JwtAuthFeature>();
         if (auth == null)
@@ -306,14 +306,14 @@ public class QuestionnaireResults_v1
         if (!_jwt.CheckAuthorization(auth, requiredScopes: AireScopes.DeletePublicQuestionnaireResults))
             return new ForbiddenResult();
 
-        if (string.IsNullOrWhiteSpace(id))
+        if (string.IsNullOrWhiteSpace(result_id))
             return new BadRequestResult();
 
         if (auth.Platform == null)
             return new BadRequestResult();
 
         var tables = await _storageService.GetTableStorageService(auth.Platform, req.GetTargetService());
-        var entity = await tables.RetrieveAsync<QuestionnairePublicResultsEntity>(questionnaire_id, id);
+        var entity = await tables.RetrieveAsync<QuestionnairePublicResultsEntity>(questionnaire_id, result_id);
         if (entity == null)
             return new NotFoundResult();
 
