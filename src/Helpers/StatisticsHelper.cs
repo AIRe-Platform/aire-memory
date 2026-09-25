@@ -14,18 +14,20 @@ public static class StatisticsHelper
 
     public static (string pk, string rk) GenerateTableKeys(DateTime dateTime, string eventName, string? id = null)
     {
-        string pk = $"{eventName}_{dateTime:yyyyMMdd}";
+        string name = EscapeEventName(eventName);
+        string pk = $"{name}_{dateTime:yyyyMMdd}";
         string rk = $"{id ?? Guid.NewGuid().ToString()}";
         return (pk, rk);
     }
 
     public static string GenerateEventPartitionFilter(string eventName, DateTime from, DateTime? to = null)
     {
-        List<string> filters = [$"PartitionKey ge '{eventName}_{from:yyyyMMdd}'"];
+        string name = EscapeEventName(eventName);
+        List<string> filters = [$"PartitionKey ge '{name}_{from:yyyyMMdd}'"];
         if (to.HasValue)
-            filters.Add($"PartitionKey lt '{eventName}_{to.Value.AddDays(1):yyyyMMdd}'");
+            filters.Add($"PartitionKey lt '{name}_{to.Value.AddDays(1):yyyyMMdd}'");
         else
-            filters.Add($"PartitionKey lt '{eventName}_{from.AddDays(1):yyyyMMdd}'");
+            filters.Add($"PartitionKey lt '{name}_{from.AddDays(1):yyyyMMdd}'");
 
         return string.Join(" and ", filters);
     }
@@ -61,5 +63,18 @@ public static class StatisticsHelper
         }
 
         return model;
+    }
+
+    public static string EscapeEventName(string eventName)
+    {
+        string escaped = "";
+        string allowedSpecials = "-_.";
+        foreach (char c in eventName)
+        {
+            if (char.IsAsciiLetterOrDigit(c) || allowedSpecials.Contains(c))
+                escaped += char.ToLower(c);
+            // Other chars ignored
+        }
+        return escaped;
     }
 }

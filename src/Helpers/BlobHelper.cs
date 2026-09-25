@@ -2,10 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-using Aire.Memory.Helpers;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Http;
+
+namespace Aire.Memory.Helpers;
 
 public static class BlobHelper
 {
@@ -22,41 +23,31 @@ public static class BlobHelper
     }
 
     // Upload the thumbnail if provided and return the URL, otherwise return null
-    public static async Task<string> UploadThumbnailIfPresent(IFormFileCollection files, BlobContainerClient blobContainer, string contentId)
+    public static async Task<string> UploadThumbnail(IFormFile file, BlobContainerClient blobContainer, string contentId)
     {
-        if (files.Any(f => f.Name == "thumbnail"))
-        {
-            var thumbnailFile = files.First(f => f.Name == "thumbnail");
-            var thumbnailBlobClient = blobContainer.GetBlobClient($"{contentId}/thumbnail");
-
-            using var thumbnailStream = thumbnailFile.OpenReadStream();
-            var thumbnailHttpHeader = new BlobHttpHeaders { ContentType = thumbnailFile.ContentType };
-
-            await thumbnailBlobClient.UploadAsync(thumbnailStream, new BlobUploadOptions { HttpHeaders = thumbnailHttpHeader });
-            return thumbnailBlobClient.Uri.ToString(); // Return the thumbnail URL
-        }
-
-        return "";
+        var thumbnailid = $"{contentId}/thumbnail";
+        return await UploadBlobAsync(file, blobContainer, thumbnailid);
     }
 
     // Optionally remove the thumbnail if the blob exists
     public static async Task RemoveThumbnailIfExists(BlobContainerClient blobContainer, string contentId)
     {
         var thumbnailBlobClient = blobContainer.GetBlobClient($"{contentId}/thumbnail");
-        var thumbnailExists = await thumbnailBlobClient.ExistsAsync();
-        if (thumbnailExists)
-        {
-            await thumbnailBlobClient.DeleteIfExistsAsync();
-        }
+        await thumbnailBlobClient.DeleteIfExistsAsync();
     }
 
-     // Uploads a file to the blob storage and returns the URL
-    public static async Task<string> UploadBlobAsync(IFormFile file, BlobContainerClient blobContainer, string contentId)
+    // Uploads a file to the blob storage and returns the URL
+    public static async Task<string> UploadBlobAsync(IFormFile file, BlobContainerClient blobContainer, string blobId)
     {
-        var blobClient = blobContainer.GetBlobClient(contentId);
         using var stream = file.OpenReadStream();
-        var blobHttpHeader = new BlobHttpHeaders { ContentType = file.ContentType };
+        return await UploadBlobAsync(stream, file.ContentType, blobContainer, blobId);
+    }
 
+    // Uploads a file to the blob storage and returns the URL
+    public static async Task<string> UploadBlobAsync(Stream stream, string contentType, BlobContainerClient blobContainer, string blobId)
+    {
+        var blobClient = blobContainer.GetBlobClient(blobId);
+        var blobHttpHeader = new BlobHttpHeaders { ContentType = contentType };
         await blobClient.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = blobHttpHeader });
         return blobClient.Uri.ToString();
     }
